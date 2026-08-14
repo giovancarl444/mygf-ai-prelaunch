@@ -73,3 +73,9 @@ The beta controls were verified through owner-path rename, private report persis
 The official-documentation alignment milestone is preserved in project checkpoint **`b6571c8e`**. It requires a provider-confirmed `saved` draft status and an exact matching durable `characterId` before the owner may map a newly generated candidate. It also adds safe, bounded retries only for transient failures on read-only provider requests, plus the authoritative `OHAPI_API_COMPLIANCE_AUDIT.md` and `GITHUB_BACKUP_OPERATING_STANDARD.md` records.
 
 The corresponding immutable source references are **`backup/ohapi-contract-audit-20260814`** and **`recovery/ohapi-contract-audit-20260814`**. Restore checkpoint **`c1e58c36`** to return to the prior controlled-beta implementation before this contract hardening. As with every provider-related checkpoint, restoring application source does not change existing remote provider or database records.
+
+## OhAPI Studio and Isolated Playground Consolidation
+
+The production-safe Studio and isolated-playground consolidation is preserved in project checkpoint **`3142a5dd`**. It includes the reviewed `tools/oh-api-playground/` package, an owner-only `/ops/ohapi` Studio, sanitized operation auditing for candidate generation, save, and approved mapping actions, the `ohapi_admin_audits` migration, and an automated guard against importing the browser-local BYOK package into production source.
+
+The corresponding immutable source references are **`backup/ohapi-studio-consolidation-20260814`** and **`recovery/ohapi-studio-consolidation-20260814`**. Restore checkpoint **`8991ebff`** to return to the exact state before the playground source was reconciled. Restoring an application checkpoint does not delete provider characters, rooms, or other remote provider records; no new provider content was created for this milestone.
