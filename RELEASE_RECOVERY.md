@@ -174,3 +174,39 @@ Follow-up to the rebuild, correcting defects found by reviewing that commit.
 
 Verified: `tsc` clean, 35 tests passing with one intentional live-network probe
 skipped, client and server builds succeed.
+
+## Provider-Verified Rebuild — main promoted
+
+`main` was fast-forwarded from `18d1885` to `97918e2`. Nothing on `main` was
+rewritten or discarded; every prior commit remains an ancestor.
+
+| Recovery layer | Identifier |
+| --- | --- |
+| Previous `main` | `18d1885` — restore point for everything before the rebuild |
+| Recovery branch | `recovery/provider-verified-rebuild-20260814` |
+| Annotated tag | **not created — see below** |
+
+This release makes GitHub `main` the single source of truth. The deployed
+application and any managed project workspace are downstream of it, and
+`CONTRIBUTING.md` records the branch rules and the ownership split that keeps two
+agents from overwriting each other.
+
+What it contains: the provider integration rebuilt against the live API rather
+than its documentation, a catalog derived from `customer-library`, server-enforced
+adult confirmation, allowances charged before any provider resource exists, room
+de-duplication, and the removal of the unauthenticated storage proxy.
+
+Migrations `0007` and `0008` must be applied before this code runs against an
+existing database.
+
+### Tag gap
+
+`backup/provider-verified-rebuild-20260814` was created locally but **could not be
+pushed**: the remote rejected the tag with HTTP 403 while accepting the branch
+from the same credential, so tag creation is not permitted for this session. The
+recovery branch above points at the same commit and serves the same purpose. To
+complete the standard, create the annotated tag from an account that has
+permission:
+
+    git tag -a backup/provider-verified-rebuild-20260814 97918e2 -m "Provider-verified rebuild"
+    git push origin backup/provider-verified-rebuild-20260814
