@@ -1,0 +1,161 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Console Atelier reminder: dark low-light materiality, instrument-like panels, purposeful orange signal moments, and violet context. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Space Grotesk", sans-serif;
+  --font-mono: "DM Mono", monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-lg: var(--radius);
+}
+
+:root,
+.dark {
+  --background: oklch(0.075 0.015 330);
+  --foreground: oklch(0.93 0.018 320);
+  --card: oklch(0.105 0.028 330);
+  --card-foreground: oklch(0.93 0.018 320);
+  --popover: oklch(0.12 0.032 330);
+  --popover-foreground: oklch(0.94 0.014 320);
+  --primary: oklch(0.69 0.18 53);
+  --primary-foreground: oklch(0.13 0.02 330);
+  --secondary: oklch(0.17 0.055 320);
+  --secondary-foreground: oklch(0.84 0.03 320);
+  --muted: oklch(0.16 0.025 325);
+  --muted-foreground: oklch(0.65 0.035 320);
+  --accent: oklch(0.34 0.16 311);
+  --accent-foreground: oklch(0.97 0.01 320);
+  --destructive: oklch(0.63 0.22 25);
+  --destructive-foreground: oklch(0.98 0.01 320);
+  --border: oklch(0.36 0.055 322 / 0.45);
+  --input: oklch(0.25 0.048 323);
+  --ring: oklch(0.69 0.18 53);
+  --radius: 0.9rem;
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+
+  html { background: #0f0a10; }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    min-width: 320px;
+    background-image:
+      radial-gradient(circle at 78% -10%, rgb(145 60 221 / 0.15), transparent 32rem),
+      radial-gradient(circle at 5% 85%, rgb(252 122 29 / 0.08), transparent 30rem);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled),
+  [type="submit"]:not(:disabled),
+  a[href] { @apply cursor-pointer; }
+
+  ::selection { background: rgb(252 122 29 / 0.28); color: #fff4ea; }
+}
+
+@layer components {
+  .atelier-grid {
+    background-image:
+      linear-gradient(rgb(255 255 255 / 0.026) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(255 255 255 / 0.026) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  .atelier-panel {
+    position: relative;
+    border: 1px solid rgb(151 89 179 / 0.24);
+    background: linear-gradient(145deg, rgb(31 8 34 / 0.94), rgb(17 1 19 / 0.98));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 20px 50px rgb(0 0 0 / 0.22);
+  }
+
+  .atelier-panel::after {
+    content: "";
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    width: 24px;
+    height: 24px;
+    border-left: 1px solid rgb(252 122 29 / 0.55);
+    border-bottom: 1px solid rgb(252 122 29 / 0.55);
+    clip-path: polygon(100% 0, 0 100%, 100% 100%);
+    background: #0f0a10;
+  }
+
+  .atelier-panel-primary {
+    border-color: rgb(252 122 29 / 0.42);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.045), 0 24px 60px rgb(0 0 0 / 0.28);
+  }
+
+  .atelier-panel-primary::before {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    top: 3.75rem;
+    bottom: 1.5rem;
+    left: -1px;
+    width: 3px;
+    background: linear-gradient(#fc7a1d, rgb(252 122 29 / 0.08));
+    box-shadow: 0 0 16px rgb(252 122 29 / 0.55);
+  }
+
+  .signal-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #c9aecf;
+    font-family: "DM Mono", monospace;
+    font-size: 0.67rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .signal-label::before {
+    content: "";
+    width: 0.34rem;
+    height: 0.34rem;
+    background: #fc7a1d;
+    box-shadow: 0 0 14px rgb(252 122 29 / 0.75);
+  }
+
+  .mono { font-family: "DM Mono", monospace; }
+
+  .scrollbar-thin { scrollbar-color: rgb(145 60 221 / 0.6) transparent; scrollbar-width: thin; }
+  .scrollbar-thin::-webkit-scrollbar { width: 7px; height: 7px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(145 60 221 / 0.5); border-radius: 99px; }
+
+  .status-pulse {
+    animation: scan 1.7s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+  }
+
+  @keyframes scan {
+    0%, 100% { opacity: 0.45; transform: scaleX(0.6); transform-origin: left; }
+    50% { opacity: 1; transform: scaleX(1); transform-origin: left; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}
