@@ -202,31 +202,39 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="worlds-section section-wrap" id="worlds" aria-labelledby="worlds-title">
-          <div className="section-heading split-heading">
-            <div>
-              <p className="eyebrow"><span className="eyebrow-dot" />A point of view, not a profile</p>
-              <h2 id="worlds-title">Six ways into<br /><em>the evening.</em></h2>
+        <section className="worlds-section" id="worlds" aria-labelledby="worlds-title">
+          <div className="worlds-inner">
+            <div className="section-heading split-heading worlds-heading">
+              <div>
+                <p className="eyebrow"><span className="eyebrow-dot" />A point of view, not a profile</p>
+                <h2 id="worlds-title">Choose a world.<br /><em>Keep the thread.</em></h2>
+              </div>
+              <p>Each world begins with a distinct pace, voice, and angle on a conversation. Meet the one that feels right for tonight.</p>
             </div>
-            <p>Each world begins with its own pace, voice, and angle on a conversation. Meet the one that feels right for tonight.</p>
-          </div>
-          <div className="worlds-grid">
-            {companionWorlds.map((world, index) => (
-              <article className={`world-card ${world.tone} ${index === 0 ? "world-card-featured" : ""}`} key={world.name}>
-                <div className="world-art" aria-hidden="true">
-                  <div className="art-halo" />
-                  <div className="art-portrait"><span /><i /></div>
-                  <span className="art-index">0{index + 1}</span>
-                </div>
-                <div className="world-content">
-                  <div className="world-meta"><span>{world.tag}</span><MoonStar size={15} /></div>
-                  <h3>{world.name}</h3>
-                  <p className="world-energy">{world.energy}</p>
-                  <blockquote>“{world.firstLine}”</blockquote>
-                  <button type="button" className="world-link" onClick={scrollToBeta}>Explore this world <ArrowUpRight size={15} /></button>
-                </div>
-              </article>
-            ))}
+            <div className="worlds-toolbar" aria-label="Worlds collection context">
+              <div className="worlds-toolbar-copy"><Sparkles size={16} /><span>Six original worlds, each with its own point of view.</span></div>
+              <div className="world-tags" aria-hidden="true"><span>Reflective</span><span>Imaginative</span><span>Private</span></div>
+              <button type="button" className="worlds-cta" onClick={scrollToBeta}>Find your starting point <ArrowUpRight size={15} /></button>
+            </div>
+            <div className="worlds-grid">
+              {companionWorlds.map((world, index) => (
+                <article className={`world-card ${world.tone} ${index === 0 ? "world-card-primary" : ""} ${index === 4 ? "world-card-secondary" : ""}`} key={world.name}>
+                  <div className="world-art" aria-hidden="true">
+                    <div className="art-halo" />
+                    <div className="art-portrait"><span /><i /></div>
+                    <span className="art-index">0{index + 1}</span>
+                    {index === 0 && <span className="world-state">Featured tonight</span>}
+                  </div>
+                  <div className="world-content">
+                    <div className="world-meta"><span>{world.tag}</span><MoonStar size={15} /></div>
+                    <h3>{world.name}</h3>
+                    <p className="world-energy">{world.energy}</p>
+                    <blockquote>“{world.firstLine}”</blockquote>
+                    <button type="button" className="world-link" onClick={scrollToBeta}>Explore this world <ArrowUpRight size={15} /></button>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
