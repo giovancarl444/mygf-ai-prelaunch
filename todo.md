@@ -81,4 +81,4 @@
 - [x] Retain the reviewed playground as an isolated private package that builds independently and is not imported by the production application.
 - [x] Log sanitized audit outcomes for draft generation, save confirmation, and approved-character mapping, with deterministic mutation-level coverage for success and failure paths.
 - [x] Add an automated isolation check proving the production application does not import from `tools/oh-api-playground/`.
-- [ ] Verify authorization, credential isolation, independent builds, visual behavior, recovery restore, and Git backup for the consolidation milestone.
+- [x] Verify authorization, credential isolation, independent builds, visual behavior, recovery restore, and Git backup for the consolidation milestone.
