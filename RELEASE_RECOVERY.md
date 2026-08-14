@@ -31,3 +31,9 @@ Before the scalable discovery catalog refactor, the current zero-overlay consume
 ## Scalable World-Library Catalog
 
 The completed search-forward catalog redesign is preserved in project checkpoint **`6236a159`**. It adds the original discovery rail, collection banner, world-type, adult-age, and energy filters, live result count, no-result reset, and browser-tested catalog interactions while retaining fully unobstructed portrait frames. To revert the catalog redesign, restore checkpoint **`e8a5bc97`**.
+
+## High-Density Catalog Translation Release
+
+The refined original MyGF.ai consumer catalog is preserved in project checkpoint **`ac7262f7`**. It introduces a uniform four-column desktop browsing field, eighteen clearly adult fictional companion worlds, six supplied portraits in fully unobstructed image-only frames, twelve explicitly labeled CSS-only abstract world previews, compact search and filters, and a separate non-portrait thread note. The existing private-beta capture, duplicate protection, and owner notification flow remain in place.
+
+To revert this release while retaining the archive research and translation specification, restore the immediate pre-refactor baseline **`75597613`**. The earlier scalable World Library remains available at **`6236a159`**, and the protected pre-catalog baseline remains **`e8a5bc97`**. The release was verified with TypeScript, seven Vitest tests, a production build, desktop and mobile catalog automation, beta-interest first-time/duplicate browser checks, visual review, and runtime-log review.
