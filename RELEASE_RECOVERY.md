@@ -15,3 +15,7 @@ The default rollback target before further product work begins is now establishe
 | Canonical production URL | `https://mygfai-prel-lqtcp7hs.manus.space/` |
 
 Use the checkpoint for managed-project rollback and the Git recovery branch or release tag for source recovery. Treat these references as immutable; future work should start on a new branch and never rewrite them.
+
+## Zero-Overlay Redesign Baseline
+
+Before the consumer-first zero-overlay redesign, the existing six-companion media experience was preserved in project checkpoint **`d02a6b36`**. This is the immediate rollback target for the current redesign work. To return to the prior companion-media presentation, restore checkpoint `d02a6b36` through project version history; it retains the managed portrait mappings, fictional adult labels, beta-interest behavior, and all earlier recovery references.
