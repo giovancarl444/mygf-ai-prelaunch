@@ -1,0 +1,1 @@
+ALTER TABLE `ohapi_characters` MODIFY COLUMN `profileImageUrl` varchar(2048);

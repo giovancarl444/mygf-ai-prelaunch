@@ -121,41 +121,64 @@ export type OhApiCharacter = {
   type: "ORIGINAL" | "DIGITAL_TWIN" | null;
 };
 
-export function normalizeOhApiCharacter(raw: unknown): OhApiCharacter | null {
-  const characterId = readString(raw, ["character_id", "characterId", "id"]);
+/**
+ * Normalizes one library entry.
+ *
+ * Verified against the live API on 14 August 2026. The published documentation
+ * describes `character_id` / `name` / `profile_image_url`; the service actually
+ * returns `characterId` (a number), `firstName`, `lastName`, and `sfwImage`,
+ * and carries no age, occupation, or type. Both spellings are accepted so a
+ * provider-side correction does not break the catalog.
+ */
+export function normalizeOhApiCharacter(raw: unknown, type: OhApiCharacter["type"] = null): OhApiCharacter | null {
+  // The service returns a numeric id but requires a string on every request
+  // that consumes one, so it is normalized to a string here, once.
+  const characterId = readString(raw, ["characterId", "character_id", "id"]);
   if (!characterId) return null;
 
   const source = asRecord(raw);
-  const rawAge = source.age ?? asRecord(source.data).age;
+  const first = readString(raw, ["firstName", "first_name"]);
+  const last = readString(raw, ["lastName", "last_name"]);
+  const combined = [first, last].filter(Boolean).join(" ").trim();
+  const fallbackName = readString(raw, ["name", "display_name", "character_name"]);
+
+  const rawAge = source.age;
   const parsedAge = typeof rawAge === "number" ? rawAge : typeof rawAge === "string" ? Number.parseInt(rawAge, 10) : Number.NaN;
   const rawType = readString(raw, ["type", "character_type"])?.toUpperCase().replace(/[\s-]/g, "_");
 
   return {
     characterId,
-    name: readString(raw, ["name", "display_name", "character_name", "first_name"]) ?? "Unnamed companion",
+    name: combined || fallbackName || "Unnamed companion",
     age: Number.isFinite(parsedAge) ? parsedAge : null,
     occupation: readString(raw, ["occupation", "job", "profession"]) ?? null,
-    profileImageUrl: readString(raw, ["profile_image_url", "profileImageUrl", "image_url", "imageUrl", "image", "avatar_url"]) ?? null,
-    type: rawType === "ORIGINAL" || rawType === "DIGITAL_TWIN" ? rawType : null,
+    // Presigned and short lived — see listOhApiCharacters.
+    profileImageUrl: readString(raw, ["sfwImage", "sfw_image", "profile_image_url", "profileImageUrl", "image_url", "imageUrl", "image"]) ?? null,
+    type: rawType === "ORIGINAL" || rawType === "DIGITAL_TWIN" ? rawType : type,
   };
 }
 
-/** GET /api/v1/characters — the provider's character library. */
+/**
+ * The provider's library for this partner account.
+ *
+ * `GET /api/v1/characters` is documented but does not exist — the live service
+ * answers `403 Unknown endpoint`. `customer-library` is the real listing and
+ * returns saved characters and digital twins together.
+ *
+ * Portrait URLs come back presigned with `X-Amz-Expires=3600`, so they are
+ * valid for one hour and must be refreshed rather than stored as durable
+ * references.
+ */
 export async function listOhApiCharacters(): Promise<OhApiCharacter[]> {
-  const response = await ohApiFetch("/api/v1/characters", { method: "GET" });
+  const response = await ohApiFetch("/api/v1/customer-library", { method: "GET" });
   const body = await response.json() as unknown;
-  return readArray(body, ["characters", "items", "results", "data"])
-    .map(normalizeOhApiCharacter)
-    .filter((character): character is OhApiCharacter => character !== null);
-}
+  const source = asRecord(body);
 
-/** GET /api/v1/characters/customer-characters — saved characters only. */
-export async function listOhApiCustomerCharacters(): Promise<OhApiCharacter[]> {
-  const response = await ohApiFetch("/api/v1/characters/customer-characters", { method: "GET" });
-  const body = await response.json() as unknown;
-  return readArray(body, ["characters", "items", "results", "data"])
-    .map(normalizeOhApiCharacter)
-    .filter((character): character is OhApiCharacter => character !== null);
+  const characters = readArray(source.characters ?? body, ["characters", "items", "results", "data"])
+    .map(item => normalizeOhApiCharacter(item, "ORIGINAL"));
+  const twins = readArray(source.digitalTwins ?? [], ["digitalTwins", "digital_twins", "items"])
+    .map(item => normalizeOhApiCharacter(item, "DIGITAL_TWIN"));
+
+  return [...characters, ...twins].filter((character): character is OhApiCharacter => character !== null);
 }
 
 export async function validateOhApiCredential() {
@@ -163,15 +186,51 @@ export async function validateOhApiCredential() {
   return response.json() as Promise<unknown>;
 }
 
+/**
+ * Fresh portrait URLs keyed by character id.
+ *
+ * Cached briefly because every call mints new one-hour signatures, and the
+ * public catalog must not issue a provider request per page view.
+ */
+const PORTRAIT_CACHE_TTL_MS = 40 * 60 * 1000;
+let portraitCache: { at: number; urls: Map<string, string> } | null = null;
+
+export async function getOhApiPortraits(now = Date.now()): Promise<Map<string, string>> {
+  if (portraitCache && now - portraitCache.at < PORTRAIT_CACHE_TTL_MS) return portraitCache.urls;
+
+  const characters = await listOhApiCharacters();
+  const urls = new Map<string, string>();
+  for (const character of characters) {
+    if (character.profileImageUrl) urls.set(character.characterId, character.profileImageUrl);
+  }
+  portraitCache = { at: now, urls };
+  return urls;
+}
+
+export function clearOhApiPortraitCache() {
+  portraitCache = null;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Rooms and text                                                              */
 /* -------------------------------------------------------------------------- */
 
-/** POST /api/v1/rooms — documented body is `{ character_id }`. */
-export async function createOhApiRoom(input: { characterId: string }) {
+/**
+ * Opens a conversation room.
+ *
+ * The documentation shows `{ character_id }` alone, which the live service
+ * rejects: "user_id is required (or legacy user_gender)". `user_id` is the
+ * current field, so the account's own identifier is passed to keep each
+ * customer's context separate provider-side. `character_id` must be a string
+ * even though the library returns it as a number.
+ */
+export async function createOhApiRoom(input: { characterId: string; userId: string }) {
   const response = await ohApiFetch("/api/v1/rooms", {
     method: "POST",
-    body: JSON.stringify({ character_id: input.characterId }),
+    body: JSON.stringify({
+      character_id: String(input.characterId),
+      user_id: String(input.userId),
+    }),
   });
   const body = await response.json() as unknown;
   const roomId = readString(body, ["room_id", "roomId", "id"]);
@@ -179,18 +238,25 @@ export async function createOhApiRoom(input: { characterId: string }) {
   return roomId;
 }
 
-/** POST /api/v1/text — documented body is `{ room_id, character_id, message }`. */
+/**
+ * Sends one turn.
+ *
+ * Verified live: `{ room_id, character_id, message }` returns 200 with the
+ * reply on `content`. The service also still accepts a legacy `{ room_id,
+ * prompt }` body, so both spellings work; this sends the documented one.
+ */
 export async function generateOhApiText(input: { roomId: string; characterId: string; message: string }) {
   const response = await ohApiFetch("/api/v1/text", {
     method: "POST",
     body: JSON.stringify({
       room_id: input.roomId,
-      character_id: input.characterId,
+      character_id: String(input.characterId),
       message: input.message,
     }),
   });
   const body = await response.json() as unknown;
-  const content = readString(body, ["reply", "response", "message", "text", "content", "output"]);
+  // `content` is what the live service returns; the rest are defensive.
+  const content = readString(body, ["content", "reply", "response", "message", "text", "output"]);
   if (!content) throw new OhApiError("OhAPI did not return text content.");
   return content;
 }

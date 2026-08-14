@@ -36,36 +36,53 @@ function lastRequest() {
 beforeEach(() => fetchMock.mockReset());
 
 /**
- * These assertions encode the published OhAPI request contract. They exist
- * because the previous implementation posted `{ room_id, prompt }` to the text
- * endpoint, which the documentation does not define.
+ * These assertions encode the contract as the live service actually behaves,
+ * verified against api.oh.xyz on 14 August 2026. They differ from the published
+ * documentation in three places, each of which is called out below.
  */
-describe("documented OhAPI request contract", () => {
+describe("verified OhAPI request contract", () => {
   it("sends the partner key as X-API-Key on every request", async () => {
     respondWith({ characters: [] });
     await listOhApiCharacters();
     expect(lastRequest().headers["X-API-Key"]).toBe("test-key");
   });
 
-  it("creates a room with only character_id", async () => {
+  /**
+   * The documented `GET /api/v1/characters` does not exist — the live service
+   * answers 403 "Unknown endpoint". customer-library is the real listing.
+   */
+  it("reads the library from customer-library, not the documented characters path", async () => {
+    respondWith({ success: true, characters: [], digitalTwins: [] });
+    await listOhApiCharacters();
+
+    expect(lastRequest().url).toBe("https://api.oh.xyz/api/v1/customer-library");
+    expect(lastRequest().url).not.toContain("/api/v1/characters");
+  });
+
+  /**
+   * Documented as `{ character_id }` alone, which the live service rejects with
+   * "user_id is required (or legacy user_gender)". character_id must also be a
+   * string even though the library returns it as a number.
+   */
+  it("creates a room with a string character_id and a user_id", async () => {
     respondWith({ room_id: "room-1" });
-    const roomId = await createOhApiRoom({ characterId: "char-1" });
+    const roomId = await createOhApiRoom({ characterId: "21555", userId: "mygf-7" });
 
     const request = lastRequest();
     expect(request.url).toBe("https://api.oh.xyz/api/v1/rooms");
     expect(request.method).toBe("POST");
-    expect(request.body).toEqual({ character_id: "char-1" });
+    expect(request.body).toEqual({ character_id: "21555", user_id: "mygf-7" });
+    expect(typeof request.body.character_id).toBe("string");
     expect(roomId).toBe("room-1");
   });
 
-  it("sends chat as room_id, character_id and message", async () => {
-    respondWith({ reply: "hello there" });
-    const content = await generateOhApiText({ roomId: "room-1", characterId: "char-1", message: "hi" });
+  it("sends chat as room_id, character_id and message, and reads content", async () => {
+    respondWith({ content: "hello there", job_id: "j1", message_id: "m1" });
+    const content = await generateOhApiText({ roomId: "room-1", characterId: "21555", message: "hi" });
 
     const request = lastRequest();
     expect(request.url).toBe("https://api.oh.xyz/api/v1/text");
-    expect(request.body).toEqual({ room_id: "room-1", character_id: "char-1", message: "hi" });
-    expect(request.body).not.toHaveProperty("prompt");
+    expect(request.body).toEqual({ room_id: "room-1", character_id: "21555", message: "hi" });
     expect(content).toBe("hello there");
   });
 
@@ -112,27 +129,56 @@ describe("documented OhAPI request contract", () => {
 });
 
 describe("provider response tolerance", () => {
-  it("normalizes characters from a wrapped payload and snake or camel keys", async () => {
+  /**
+   * The real payload shape, copied from a live customer-library response: a
+   * numeric characterId, split first and last names, an sfwImage portrait, and
+   * no age, occupation, or type at all.
+   */
+  it("normalizes the live customer-library shape", async () => {
     respondWith({
-      data: {
-        characters: [
-          { character_id: "c1", name: "Ada", age: "27", occupation: "Editor", profile_image_url: "https://x.test/a.jpg", type: "ORIGINAL" },
-          { characterId: "c2", name: "Bea", age: 31, profileImageUrl: "https://x.test/b.jpg", type: "digital-twin" },
-        ],
-      },
+      success: true,
+      characters: [{ characterId: 21555, firstName: "Sienna", lastName: "Vale", sfwImage: "https://s3.test/sfw.png?X-Amz-Expires=3600" }],
+      digitalTwins: [],
+    });
+
+    expect(await listOhApiCharacters()).toEqual([{
+      characterId: "21555",
+      name: "Sienna Vale",
+      age: null,
+      occupation: null,
+      profileImageUrl: "https://s3.test/sfw.png?X-Amz-Expires=3600",
+      type: "ORIGINAL",
+    }]);
+  });
+
+  it("coerces the numeric character id to the string every request needs", async () => {
+    respondWith({ characters: [{ characterId: 21555, firstName: "Sienna", lastName: "Vale" }], digitalTwins: [] });
+    const [character] = await listOhApiCharacters();
+    expect(character.characterId).toBe("21555");
+    expect(typeof character.characterId).toBe("string");
+  });
+
+  it("labels digital twins from the array they arrive in", async () => {
+    respondWith({
+      characters: [{ characterId: 1, firstName: "Ada", lastName: "Lovelace" }],
+      digitalTwins: [{ characterId: 2, firstName: "Bea", lastName: "Twin" }],
     });
 
     const characters = await listOhApiCharacters();
-    expect(characters).toEqual([
-      { characterId: "c1", name: "Ada", age: 27, occupation: "Editor", profileImageUrl: "https://x.test/a.jpg", type: "ORIGINAL" },
-      { characterId: "c2", name: "Bea", age: 31, occupation: null, profileImageUrl: "https://x.test/b.jpg", type: "DIGITAL_TWIN" },
-    ]);
+    expect(characters.map(c => [c.name, c.type])).toEqual([["Ada Lovelace", "ORIGINAL"], ["Bea Twin", "DIGITAL_TWIN"]]);
+  });
+
+  it("still accepts the documented spellings in case the provider corrects them", async () => {
+    respondWith({ characters: [{ character_id: "c1", name: "Ada", age: "27", occupation: "Editor", profile_image_url: "https://x.test/a.jpg" }] });
+    expect(await listOhApiCharacters()).toEqual([{
+      characterId: "c1", name: "Ada", age: 27, occupation: "Editor", profileImageUrl: "https://x.test/a.jpg", type: "ORIGINAL",
+    }]);
   });
 
   it("drops entries that carry no usable character id", async () => {
-    respondWith({ characters: [{ name: "No id" }, { character_id: "c9", name: "Keeper" }] });
+    respondWith({ characters: [{ firstName: "No id" }, { characterId: 9, firstName: "Keeper", lastName: "Kept" }] });
     const characters = await listOhApiCharacters();
-    expect(characters.map(character => character.characterId)).toEqual(["c9"]);
+    expect(characters.map(character => character.characterId)).toEqual(["9"]);
   });
 
   it("falls back to a status-only message when an error body is unreadable", async () => {

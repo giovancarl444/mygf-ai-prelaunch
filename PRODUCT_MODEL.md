@@ -74,11 +74,11 @@ rejection.
   webhook receiver and a separate safety design before it belongs in the product.
 - **Public media galleries.** Generated media is private to the account that
   requested it. There is no shared or public feed.
-- **Durable media storage.** Provider results are short-lived presigned URLs and
-  MyGF.ai does not re-host them, so the in-chat gallery only shows results from
-  the last 30 minutes. Persisting media needs an object store and a retention and
-  deletion policy — it is the first thing to build in the next phase, not a
-  detail to bolt on.
+- **Durable media storage.** Measured against the live service, generated media
+  stays fetchable for seven days, so re-hosting is not currently needed. The
+  gallery is bounded to six days. Revisit only if the provider shortens that
+  window or customers need media kept indefinitely — at which point it needs an
+  object store plus a retention and deletion policy, not a quick bolt-on.
 - **Reviews, ratings, testimonials.** None exist, and none should be fabricated.
 
 ## Owner operations

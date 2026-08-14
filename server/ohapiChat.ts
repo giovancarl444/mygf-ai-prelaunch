@@ -12,6 +12,7 @@ import {
   createOhapiMessage,
   createOhapiReport,
   createOwnedOhapiRoom,
+  dedupeOwnedOhapiRooms,
   getChattableOhapiCharacter,
   getOwnedOhapiRoom,
   getUserAdultConfirmedAt,
@@ -67,12 +68,33 @@ async function ensureOwnedRoom(input: { userId: number; ohapiCharacterId: number
   }
 
   try {
-    const providerRoomId = await createOhApiRoom({ characterId: input.providerCharacterId });
-    return await createOwnedOhapiRoom({
+    const providerRoomId = await createOhApiRoom({
+      characterId: input.providerCharacterId,
+      // The provider keys conversation context on this, so it must be stable
+      // per account and must not collide with another partner's user space.
+      userId: `mygf-${input.userId}`,
+    });
+    await createOwnedOhapiRoom({
       userId: input.userId,
       ohapiCharacterId: input.ohapiCharacterId,
       providerRoomId,
     });
+
+    // Two concurrent first messages can both reach this point and each create a
+    // provider room. Collapse to the earliest so the conversation stays in one
+    // room, then re-read the winner rather than assuming it is the row we just
+    // inserted.
+    await dedupeOwnedOhapiRooms({
+      userId: input.userId,
+      ohapiCharacterId: input.ohapiCharacterId,
+    });
+
+    const room = await getOwnedOhapiRoom({
+      userId: input.userId,
+      ohapiCharacterId: input.ohapiCharacterId,
+    });
+    if (!room) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The conversation could not be opened." });
+    return room;
   } catch (error) {
     if (error instanceof TRPCError) throw error;
     return providerFailure(error);

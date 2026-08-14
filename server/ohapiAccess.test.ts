@@ -5,6 +5,13 @@ const mocks = vi.hoisted(() => ({
   publishedCompanions: [] as unknown[],
 }));
 
+vi.mock("./ohapi", async importOriginal => {
+  const original = await importOriginal<typeof import("./ohapi")>();
+  // The public catalog refreshes portraits from the provider; tests must not
+  // reach the network to assert authorization behaviour.
+  return { ...original, getOhApiPortraits: vi.fn(async () => new Map<string, string>()) };
+});
+
 vi.mock("./ohapiDb", async importOriginal => {
   const original = await importOriginal<typeof import("./ohapiDb")>();
   return {

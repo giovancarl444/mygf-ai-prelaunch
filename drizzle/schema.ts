@@ -29,9 +29,13 @@ export const betaInterests = mysqlTable("beta_interests", {
 });
 
 /**
- * Local registry of provider characters. Rows are synced from
- * `GET /api/v1/characters` so the public catalog reflects what can actually be
- * talked to, rather than hand-authored marketing entries.
+ * Local registry of provider characters, synced from `GET /api/v1/customer-library`
+ * so the public catalog reflects who can actually be talked to rather than
+ * hand-authored marketing entries.
+ *
+ * `profileImageUrl` holds the last portrait seen at sync time. It is presigned
+ * and expires after an hour, so it is a diagnostic record, not what the public
+ * catalog serves — see `getOhApiPortraits`.
  */
 export const ohapiCharacters = mysqlTable("ohapi_characters", {
   id: int("id").autoincrement().primaryKey(),
@@ -43,7 +47,8 @@ export const ohapiCharacters = mysqlTable("ohapi_characters", {
   visibility: mysqlEnum("visibility", ["published", "hidden"]).default("published").notNull(),
   age: int("age"),
   occupation: varchar("occupation", { length: 160 }),
-  profileImageUrl: varchar("profileImageUrl", { length: 1024 }),
+  // Provider portrait URLs are presigned and run past 1,700 characters.
+  profileImageUrl: varchar("profileImageUrl", { length: 2048 }),
   tagline: varchar("tagline", { length: 240 }),
   providerType: mysqlEnum("providerType", ["ORIGINAL", "DIGITAL_TWIN"]),
   syncedAt: timestamp("syncedAt"),
@@ -59,8 +64,8 @@ export const ohapiRooms = mysqlTable("ohapi_rooms", {
   userId: int("userId").notNull().references(() => users.id),
   ohapiCharacterId: int("ohapiCharacterId").notNull().references(() => ohapiCharacters.id),
   providerRoomId: varchar("providerRoomId", { length: 160 }).notNull().unique(),
-  // Local preference metadata only. `POST /api/v1/rooms` documents a single
-  // `character_id` field, so neither value is sent to the provider.
+  // Local preference metadata. Room creation sends `user_id` (this account),
+  // not a gender; the column is retained for rooms opened before that change.
   userGender: mysqlEnum("userGender", ["male", "female"]),
   textingStyle: mysqlEnum("textingStyle", ["default", "short-form", "long-form"]).default("default").notNull(),
   title: varchar("title", { length: 120 }),

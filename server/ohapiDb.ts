@@ -213,14 +213,48 @@ export async function getUserAdultConfirmedAt(userId: number) {
 /* Rooms, messages, reports                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The account's live room for one companion.
+ *
+ * Ordered by id so the *earliest* room always wins. Without an order the winner
+ * is whatever the engine returns first, which can differ between calls and make
+ * a conversation appear to jump between two rooms.
+ */
 export async function getOwnedOhapiRoom(input: { userId: number; ohapiCharacterId: number }) {
   const db = await requireDb();
   const rows = await db.select().from(ohapiRooms).where(and(
     eq(ohapiRooms.userId, input.userId),
     eq(ohapiRooms.ohapiCharacterId, input.ohapiCharacterId),
     isNull(ohapiRooms.deletedAt),
-  )).limit(1);
+  )).orderBy(asc(ohapiRooms.id)).limit(1);
   return rows[0];
+}
+
+/**
+ * Collapses duplicate live rooms for one account and companion down to the
+ * earliest, and reports how many were retired.
+ *
+ * Two concurrent first messages — a double click, or two open tabs — can both
+ * observe "no room yet" and each create one provider-side. The provider room
+ * that loses is already paid for and cannot be recovered, but leaving it linked
+ * locally would split the conversation across two rooms and keep billing for
+ * both. Retiring the extras makes the local state single-valued again.
+ */
+export async function dedupeOwnedOhapiRooms(input: { userId: number; ohapiCharacterId: number }) {
+  const db = await requireDb();
+  const rows = await db.select({ id: ohapiRooms.id }).from(ohapiRooms).where(and(
+    eq(ohapiRooms.userId, input.userId),
+    eq(ohapiRooms.ohapiCharacterId, input.ohapiCharacterId),
+    isNull(ohapiRooms.deletedAt),
+  )).orderBy(asc(ohapiRooms.id));
+
+  if (rows.length <= 1) return { kept: rows[0]?.id ?? null, retired: 0 };
+
+  const [keep, ...extras] = rows;
+  await db.update(ohapiRooms)
+    .set({ deletedAt: new Date() })
+    .where(inArray(ohapiRooms.id, extras.map(row => row.id)));
+  return { kept: keep.id, retired: extras.length };
 }
 
 export async function getOwnedOhapiRoomById(input: { userId: number; roomId: number }) {
@@ -428,11 +462,13 @@ export async function updateOhapiMediaJob(input: {
 }
 
 /**
- * Provider result URLs are presigned and short-lived, and MyGF.ai does not
- * re-host the asset. Anything older than this window would render as a broken
- * image, so the gallery is bounded to results that are plausibly still fetchable.
+ * Measured against the live service: generated media is returned on a legacy
+ * presigned S3 URL with `Expires` set seven days out. The gallery is bounded to
+ * six days so a result is never shown after its link has died, while leaving a
+ * day of margin. MyGF.ai does not re-host the asset, so this window is the only
+ * thing keeping dead links off the page.
  */
-export const MEDIA_RESULT_FRESH_MS = 30 * 60 * 1000;
+export const MEDIA_RESULT_FRESH_MS = 6 * 24 * 60 * 60 * 1000;
 
 export async function listOwnedOhapiMediaJobs(input: { userId: number; ohapiCharacterId?: number; now?: Date }) {
   const db = await requireDb();
