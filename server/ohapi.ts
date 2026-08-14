@@ -227,18 +227,57 @@ export function clearOhApiPortraitCache() {
  * customer's context separate provider-side. `character_id` must be a string
  * even though the library returns it as a number.
  */
-export async function createOhApiRoom(input: { characterId: string; userId: string }) {
-  const response = await ohApiFetch("/api/v1/rooms", {
-    method: "POST",
-    body: JSON.stringify({
-      character_id: String(input.characterId),
-      user_id: String(input.userId),
-    }),
+/**
+ * The reply register a room answers in.
+ *
+ * `default` keeps the provider's production style. `short-form` is a brief,
+ * punchy chat-speak register. `long-form` is a warm, natural one. It applies to
+ * text and to voice notes, and can be changed later on the room.
+ */
+export type OhApiTextingStyle = "default" | "short-form" | "long-form";
+
+export async function createOhApiRoom(input: {
+  characterId: string;
+  userId: string;
+  textingStyle?: OhApiTextingStyle;
+}) {
+  // Room creation is the one call the whole conversation depends on, so the
+  // request we have watched succeed is kept separable from the field we are
+  // adding on the strength of the specification alone.
+  const verified = {
+    character_id: String(input.characterId),
+    user_id: String(input.userId),
+  };
+  const withStyle = input.textingStyle && input.textingStyle !== "default"
+    ? { ...verified, texting_style: input.textingStyle }
+    : verified;
+
+  const read = async (body: Record<string, unknown>) => {
+    const response = await ohApiFetch("/api/v1/rooms", { method: "POST", body: JSON.stringify(body) });
+    const roomId = readString(await response.json() as unknown, ["room_id", "roomId", "id"]);
+    if (!roomId) throw new OhApiError("OhAPI did not return a room identifier.");
+    return roomId;
+  };
+
+  try {
+    return await read(withStyle);
+  } catch (error) {
+    if (withStyle === verified || !(error instanceof OhApiError) || error.status !== 400) throw error;
+    console.warn("[OhAPI] Room creation rejected texting_style. Retrying without it.");
+    return read(verified);
+  }
+}
+
+/**
+ * PATCH /api/v1/rooms/{room_id}/texting-style
+ *
+ * Applies from the next generated reply, for text and voice notes alike.
+ */
+export async function setOhApiRoomTextingStyle(input: { roomId: string; textingStyle: OhApiTextingStyle }) {
+  await ohApiFetch(`/api/v1/rooms/${encodeURIComponent(input.roomId)}/texting-style`, {
+    method: "PATCH",
+    body: JSON.stringify({ texting_style: input.textingStyle }),
   });
-  const body = await response.json() as unknown;
-  const roomId = readString(body, ["room_id", "roomId", "id"]);
-  if (!roomId) throw new OhApiError("OhAPI did not return a room identifier.");
-  return roomId;
 }
 
 /**

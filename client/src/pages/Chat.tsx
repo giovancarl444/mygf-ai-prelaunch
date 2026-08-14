@@ -117,6 +117,10 @@ export default function Chat() {
     },
   });
 
+  const setTextingStyle = trpc.chat.setTextingStyle.useMutation({
+    onSuccess: async () => { await utils.chat.history.invalidate(); },
+  });
+
   const report = trpc.chat.report.useMutation({
     onSuccess: () => {
       setReportSent(true);
@@ -399,6 +403,24 @@ export default function Chat() {
                   <p className="chat-subtitle">AI companion{her.occupation ? ` · ${her.occupation}` : ""}</p>
                 </div>
                 <div className="chat-head-actions">
+                  {/* How she writes. The provider applies it from her next
+                      reply, for voice notes as well as text. */}
+                  {history.data?.room && (
+                    <select
+                      className="chat-style-select"
+                      aria-label="How she writes"
+                      value={history.data.room.textingStyle}
+                      disabled={setTextingStyle.isPending}
+                      onChange={event => setTextingStyle.mutate({
+                        roomId: history.data!.room!.id,
+                        textingStyle: event.target.value as "default" | "short-form" | "long-form",
+                      })}
+                    >
+                      <option value="short-form">Texts like a person</option>
+                      <option value="long-form">Writes at length</option>
+                      <option value="default">Her default</option>
+                    </select>
+                  )}
                   <button
                     type="button"
                     className="ghost-button media-toggle"

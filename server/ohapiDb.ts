@@ -285,6 +285,18 @@ export async function createOwnedOhapiRoom(input: {
   return room;
 }
 
+export async function setOwnedOhapiRoomTextingStyle(input: {
+  userId: number;
+  roomId: number;
+  textingStyle: "default" | "short-form" | "long-form";
+}) {
+  const db = await requireDb();
+  const room = await getOwnedOhapiRoomById({ userId: input.userId, roomId: input.roomId });
+  if (!room) return null;
+  await db.update(ohapiRooms).set({ textingStyle: input.textingStyle }).where(eq(ohapiRooms.id, room.id));
+  return { ...room, textingStyle: input.textingStyle };
+}
+
 /** Live rooms an account currently holds. Bounds provider-side room creation. */
 export async function countLiveOhapiRooms(userId: number) {
   const db = await requireDb();

@@ -87,6 +87,17 @@ Three things follow from that, and each is load-bearing:
 The generation panel still exists as a direct route to the same operations, and
 its results now land in the thread too.
 
+## How she writes
+
+Rooms are opened in the provider's `short-form` register rather than its
+production default. The default answers in paragraphs; someone you are texting
+does not. It costs nothing, applies to voice notes as well as text, and it is
+the cheapest realism available.
+
+It is a per-conversation choice, changeable from the chat header and applied by
+the provider from her next reply. `default` and `long-form` remain available for
+anyone who wants the longer register.
+
 ## Limits
 
 Per account, per UTC hour: 60 messages, 12 media generations, 12 new rooms, and a

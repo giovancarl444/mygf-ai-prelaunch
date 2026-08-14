@@ -889,6 +889,22 @@ p {
   color: #fff;
 }
 
+/* The reply register for one conversation. */
+.chat-style-select {
+  max-width: 150px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+}
+
+.chat-style-select:disabled {
+  opacity: 0.6;
+}
+
 /* A photo, video, or voice note she sent, sitting in the thread with her words. */
 .message-media {
   display: flex;

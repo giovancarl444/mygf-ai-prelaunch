@@ -10,6 +10,7 @@ import {
   requestOhApiAudio,
   requestOhApiImage,
   requestOhApiVideo,
+  setOhApiRoomTextingStyle,
 } from "./ohapi";
 
 const fetchMock = vi.fn();
@@ -74,6 +75,55 @@ describe("verified OhAPI request contract", () => {
     expect(request.body).toEqual({ character_id: "21555", user_id: "mygf-7" });
     expect(typeof request.body.character_id).toBe("string");
     expect(roomId).toBe("room-1");
+  });
+
+  /**
+   * `texting_style` decides the register she answers in, for text and voice
+   * notes alike. `default` is the provider's own, so it is left off the wire.
+   */
+  it("opens a room in the requested register", async () => {
+    respondWith({ room_id: "room-2" });
+    await createOhApiRoom({ characterId: "21555", userId: "mygf-7", textingStyle: "short-form" });
+
+    expect(lastRequest().body).toEqual({
+      character_id: "21555",
+      user_id: "mygf-7",
+      texting_style: "short-form",
+    });
+  });
+
+  it("omits the register when it is the provider's own default", async () => {
+    respondWith({ room_id: "room-3" });
+    await createOhApiRoom({ characterId: "21555", userId: "mygf-7", textingStyle: "default" });
+    expect(lastRequest().body).toEqual({ character_id: "21555", user_id: "mygf-7" });
+  });
+
+  /**
+   * Room creation is the one call the whole conversation depends on. The
+   * register is documented rather than observed, so it is never allowed to be
+   * the reason someone cannot open a chat.
+   */
+  it("opens the room without the register rather than not at all", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ message: "unexpected field" }),
+    } as unknown as Response);
+    respondWith({ room_id: "room-4" });
+
+    const roomId = await createOhApiRoom({ characterId: "21555", userId: "mygf-7", textingStyle: "short-form" });
+
+    expect(roomId).toBe("room-4");
+    expect(lastRequest().body).toEqual({ character_id: "21555", user_id: "mygf-7" });
+  });
+
+  it("changes the register on an existing room", async () => {
+    respondWith({ room_id: "room-1", texting_style: "long-form" });
+    await setOhApiRoomTextingStyle({ roomId: "room-1", textingStyle: "long-form" });
+
+    expect(lastRequest().url).toBe("https://api.oh.xyz/api/v1/rooms/room-1/texting-style");
+    expect(lastRequest().method).toBe("PATCH");
+    expect(lastRequest().body).toEqual({ texting_style: "long-form" });
   });
 
   it("sends chat as room_id, character_id and message, and reads content", async () => {

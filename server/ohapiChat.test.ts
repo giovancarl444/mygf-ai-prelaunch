@@ -116,7 +116,12 @@ describe("chat.send end to end", () => {
   it("opens a room and sends the message using the documented field names", async () => {
     const result = await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "hey there" });
 
-    expect(provider.createRoom).toHaveBeenCalledWith({ characterId: "char-77", userId: "mygf-7" });
+    expect(provider.createRoom).toHaveBeenCalledWith({
+      characterId: "char-77",
+      userId: "mygf-7",
+      // Someone you are texting does not answer in paragraphs.
+      textingStyle: "short-form",
+    });
     expect(provider.generateText).toHaveBeenCalledWith({
       roomId: "room-abc",
       characterId: "char-77",

@@ -2,7 +2,15 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { adultProcedure } from "./ohapiAccess";
-import { createOhApiRoom, generateOhApiText, requestOhApiAudio, requestOhApiImage, requestOhApiVideo } from "./ohapi";
+import {
+  createOhApiRoom,
+  generateOhApiText,
+  type OhApiTextingStyle,
+  requestOhApiAudio,
+  requestOhApiImage,
+  requestOhApiVideo,
+  setOhApiRoomTextingStyle,
+} from "./ohapi";
 import { type ChatMediaKind, composeMediaPrompt, detectChatMediaRequest } from "./ohapiChatIntent";
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import { randomUUID } from "node:crypto";
@@ -19,6 +27,7 @@ import {
   dedupeOwnedOhapiRooms,
   getChattableOhapiCharacter,
   getOwnedOhapiRoom,
+  getOwnedOhapiRoomById,
   getUserAdultConfirmedAt,
   HOURLY_ROOM_LIMIT,
   HOURLY_TEXT_LIMIT,
@@ -30,10 +39,23 @@ import {
   peekOhapiAllowance,
   refundOhapiAllowance,
   renameOwnedOhapiRoom,
+  setOwnedOhapiRoomTextingStyle,
   touchOhapiRoom,
 } from "./ohapiDb";
 
 const worldSlugSchema = z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/);
+const textingStyleSchema = z.enum(["default", "short-form", "long-form"]);
+
+/**
+ * How a new companion writes, until the customer says otherwise.
+ *
+ * The provider's `default` is a production register that answers in paragraphs.
+ * Someone you are texting does not. `short-form` is the brief, punchy register,
+ * and it is the single cheapest thing available that makes a companion read
+ * like a person rather than like a model — it costs nothing and applies to
+ * voice notes as well as text.
+ */
+const DEFAULT_TEXTING_STYLE: OhApiTextingStyle = "short-form";
 
 async function requireCompanion(worldSlug: string) {
   const character = await getChattableOhapiCharacter(worldSlug);
@@ -78,11 +100,13 @@ async function ensureOwnedRoom(input: { userId: number; ohapiCharacterId: number
       // The provider keys conversation context on this, so it must be stable
       // per account and must not collide with another partner's user space.
       userId: `mygf-${input.userId}`,
+      textingStyle: DEFAULT_TEXTING_STYLE,
     });
     await createOwnedOhapiRoom({
       userId: input.userId,
       ohapiCharacterId: input.ohapiCharacterId,
       providerRoomId,
+      textingStyle: DEFAULT_TEXTING_STYLE,
     });
 
     // Two concurrent first messages can both reach this point and each create a
@@ -232,7 +256,7 @@ export const ohapiChatRouter = router({
    */
   history: protectedProcedure.input(z.object({ worldSlug: worldSlugSchema })).query(async ({ ctx, input }) => {
     const empty = {
-      room: null,
+      room: null as { id: number; title: string | null; textingStyle: OhApiTextingStyle } | null,
       messages: [] as { id: number; role: "user" | "assistant"; content: string; createdAt: Date }[],
       media: [] as {
         jobId: string;
@@ -257,7 +281,7 @@ export const ohapiChatRouter = router({
 
     const staleBefore = Date.now() - TRANSCRIPT_PENDING_WINDOW_MS;
     return {
-      room: { id: room.id, title: room.title },
+      room: { id: room.id, title: room.title, textingStyle: room.textingStyle },
       messages: messages.map(message => ({
         id: message.id,
         role: message.role,
@@ -367,6 +391,30 @@ export const ohapiChatRouter = router({
     const room = await renameOwnedOhapiRoom({ userId: ctx.user.id, roomId: input.roomId, title: input.title });
     if (!room) throw new TRPCError({ code: "NOT_FOUND", message: "This conversation is no longer available." });
     return { id: room.id, title: room.title };
+  }),
+
+  /**
+   * Changes how she writes in one conversation.
+   *
+   * The provider applies it from the next reply, for text and voice notes
+   * alike. It is stored locally too so the choice survives and so the control
+   * can show its current state without asking the provider.
+   */
+  setTextingStyle: protectedProcedure.input(z.object({
+    roomId: z.number().int().positive(),
+    textingStyle: textingStyleSchema,
+  })).mutation(async ({ ctx, input }) => {
+    const room = await getOwnedOhapiRoomById({ userId: ctx.user.id, roomId: input.roomId });
+    if (!room) throw new TRPCError({ code: "NOT_FOUND", message: "This conversation is no longer available." });
+
+    try {
+      await setOhApiRoomTextingStyle({ roomId: room.providerRoomId, textingStyle: input.textingStyle });
+    } catch (error) {
+      return providerFailure(error);
+    }
+
+    await setOwnedOhapiRoomTextingStyle({ userId: ctx.user.id, roomId: input.roomId, textingStyle: input.textingStyle });
+    return { textingStyle: input.textingStyle };
   }),
 
   clearThread: protectedProcedure.input(z.object({ roomId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {

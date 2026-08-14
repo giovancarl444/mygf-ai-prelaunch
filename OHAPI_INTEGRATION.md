@@ -219,11 +219,12 @@ available again, not a list of things to "fix" toward the documentation.
 
 ### Available and not yet used
 
-Recorded so these are decisions rather than oversights:
+Recorded so these are decisions rather than oversights.
+`texting_style` was on this list and is now used: rooms open as `short-form`,
+changeable per conversation through `PATCH /api/v1/rooms/{room_id}/texting-style`.
+Room creation drops the field and retries if the service rejects it, because
+nothing may stand between a customer and opening a chat.
 
-- **`texting_style`** on room creation — `default` | `short-form` | `long-form`,
-  plus `PATCH /api/v1/rooms/{room_id}/texting-style`. `ohapi_rooms.textingStyle`
-  already stores exactly these three values and is never sent to the provider.
 - **Video controls** — `length` (5/10/15), `resolution`, and for image-to-video a
   `category` enum of motion types. We send none of them.
 - **`GET /api/v1/videos/get`** — a separate status path for image-to-video.
