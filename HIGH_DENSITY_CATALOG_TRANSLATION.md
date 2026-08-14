@@ -68,3 +68,6 @@ MyGF.ai will not use the reference brand, naming, logo system, copy, sales claim
 | Required exact copy remains | DOM/text review for hero, trust labels, how-it-works labels, selector options, and footer disclaimer. |
 | Beta-interest behavior remains intact | Existing first-time and duplicate browser checks plus server tests. |
 
+## Visual QA Record
+
+Desktop review confirmed the intended four-column result field with image-only portrait frames, independent colorful dossiers, a persistent discovery rail, a compact search-and-filter control bar, and a visible result count. Mobile review confirmed the narrow breakpoint stacks the same world cards into one column, retains the separate dossier immediately below each media frame, and presents the non-portrait thread note as an original editorial interruption. CSS-only world previews are visually distinct from supplied portraits and are labeled in their dossiers rather than over their media art.
