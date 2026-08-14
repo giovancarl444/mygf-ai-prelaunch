@@ -4,6 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { ArrowLeft, CircleAlert, Flag, Loader2, LockKeyhole, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -15,7 +16,7 @@ type ProviderRoomGender = "male" | "female";
 type TextingStyle = "default" | "short-form" | "long-form";
 
 export default function Pilot() {
-  const { user, loading, isAuthenticated } = useAuth({ redirectOnUnauthenticated: true });
+  const { user, loading, isAuthenticated } = useAuth();
   const [selectedWorld, setSelectedWorld] = useState("");
   const [userGender, setUserGender] = useState<ProviderRoomGender | "">("");
   const [textingStyle, setTextingStyle] = useState<TextingStyle>("default");
@@ -139,8 +140,12 @@ export default function Pilot() {
     });
   };
 
-  if (loading || !isAuthenticated) {
+  if (loading) {
     return <main className="pilot-loading"><Loader2 className="animate-spin" size={24} /><span>Opening your private pilot…</span></main>;
+  }
+
+  if (!isAuthenticated) {
+    return <main className="pilot-shell pilot-access-shell"><header className="pilot-header"><Link href="/" className="pilot-brand"><span className="brand-mark" aria-hidden="true"><span /></span><span>mygf<span>.ai</span></span></Link><Link href="/" className="pilot-exit"><ArrowLeft size={15} />Back to worlds</Link></header><section className="pilot-access-gate" aria-labelledby="private-access-title"><p className="map-kicker"><span />Private access</p><h1 id="private-access-title">Your private thread<br /><em>starts with your account.</em></h1><p>Sign in before a conversation begins so your thread, reporting controls, transcript clear action, and hourly limit remain attached to you—not a shared browser session.</p><button type="button" className="rose-button" onClick={() => startLogin()}>Sign in to continue <Sparkles size={17} /></button><small><LockKeyhole size={13} />Adult AI companion experience · Not therapy · Not human</small></section></main>;
   }
 
   return (

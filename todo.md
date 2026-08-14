@@ -82,3 +82,12 @@
 - [x] Log sanitized audit outcomes for draft generation, save confirmation, and approved-character mapping, with deterministic mutation-level coverage for success and failure paths.
 - [x] Add an automated isolation check proving the production application does not import from `tools/oh-api-playground/`.
 - [x] Verify authorization, credential isolation, independent builds, visual behavior, recovery restore, and Git backup for the consolidation milestone.
+- [x] Audit Sienna’s local mapping, provider lifecycle evidence, and current character-readiness gap without creating provider content.
+- [x] Trace and document every pre-launch signup, request-access, and login entry path in the live product.
+- [x] Define and implement the live-product access flow with clear sign-in behavior and no pre-launch interest-capture CTA.
+- [x] Create a documented Sienna readiness standard and surface only her verified current state to the owner.
+- [ ] Verify the revised access flow, tests, production build, recovery record, and Git backup.
+- [ ] Record the live-access transition and Sienna identity-review hold in the release recovery guide.
+- [ ] Save the live-access transition as a managed checkpoint and push matching immutable Git tag and recovery branch.
+- [x] Add deterministic regression coverage for the live-access language and explicit sign-in gate.
+- [x] Remove the global unauthorized-query redirect that bypasses the explicit private-account sign-in gate, and extend its regression coverage.

@@ -216,14 +216,16 @@ export async function listRecentOhapiAdminAudits(limit = 25) {
 
 export async function getOhapiStudioSummary() {
   const db = await requireDb();
-  const [approved, activeRooms, openReports] = await Promise.all([
+  const [approved, activeRooms, openReports, sienna] = await Promise.all([
     db.select({ total: sql<number>`count(*)` }).from(ohapiCharacters).where(eq(ohapiCharacters.status, "approved")),
     db.select({ total: sql<number>`count(*)` }).from(ohapiRooms).where(isNull(ohapiRooms.deletedAt)),
     db.select({ total: sql<number>`count(*)` }).from(ohapiReports).where(eq(ohapiReports.status, "open")),
+    db.select({ providerCharacterId: ohapiCharacters.providerCharacterId, status: ohapiCharacters.status }).from(ohapiCharacters).where(eq(ohapiCharacters.worldSlug, "sienna-vale")).limit(1),
   ]);
   return {
     approvedCharacters: Number(approved[0]?.total ?? 0),
     activeRooms: Number(activeRooms[0]?.total ?? 0),
     openReports: Number(openReports[0]?.total ?? 0),
+    sienna: sienna[0] ? { providerCharacterId: sienna[0].providerCharacterId ?? null, localStatus: sienna[0].status, readiness: "identity_review_required" as const } : null,
   };
 }

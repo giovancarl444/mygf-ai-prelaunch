@@ -15,15 +15,8 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { trpc } from "@/lib/trpc";
+import { useEffect, useMemo, useState } from "react";
 import { filterCatalogWorlds, type AgeFilter, type EnergyFilter, type WorldCategory } from "@/lib/catalogFilters";
-
-type InterestChoice =
-  | "story/character continuity"
-  | "reflective conversation"
-  | "imaginative roleplay"
-  | "curious about AI";
 
 const categories: WorldCategory[] = ["All", "Reflective", "Story", "Imaginative", "Curious"];
 const ageFilters: AgeFilter[] = ["Any age", "21–24", "25–29", "30+"];
@@ -78,26 +71,19 @@ function WorldMedia({ world, variant = "catalog" }: { world: CompanionWorld; var
 const principles = [
   { title: "AI, always clearly", copy: "Every exchange is presented as AI. No hidden human role and no blurred line about what this is.", icon: Eye },
   { title: "Memory you control", copy: "Useful details are designed to be reviewable. You decide what becomes a memory, and what does not.", icon: Orbit },
-  { title: "Private by design", copy: "A personal space should come with clear boundaries. We are building the controls before we broaden access.", icon: LockKeyhole },
+  { title: "Private by design", copy: "A personal space comes with clear boundaries, account ownership, and visible controls.", icon: LockKeyhole },
 ];
 
 const faqs = [
-  { question: "What is MyGF.ai?", answer: "MyGF.ai is an adult AI companion-world experience in development. Each world has a distinct voice, atmosphere, and starting point for a private thread." },
+  { question: "What is MyGF.ai?", answer: "MyGF.ai is an adult AI companion-world experience. Each world has a distinct voice, atmosphere, and starting point for a private thread." },
   { question: "Will I always know I am interacting with AI?", answer: "Yes. AI, always clearly is a product principle. MyGF.ai does not present the experience as a human relationship or make claims about human feelings." },
-  { question: "How will memory work?", answer: "The design direction is reviewable memory. The full product is still in development, but the goal is for people to see, keep, edit, or remove details on their terms." },
-  { question: "What happens when I request private-beta access?", answer: "Your email, optional interest selection, timestamp, and source are stored to help manage beta invitations. We use the email only to follow up about that interest." },
+  { question: "How will memory work?", answer: "Threads are account-owned, and local transcript controls are visible in the private space. Memory features remain intentionally reviewable rather than assumed." },
+  { question: "How do I start?", answer: "Choose private access, sign in to create an account-owned thread, select a world and room context, then confirm you are an adult before sending a message." },
   { question: "Is MyGF.ai therapy or a substitute for people?", answer: "No. It is an adult AI companion experience, not therapy and not human. The product is designed around imaginative conversation, clarity, and user control." },
 ];
 
-function scrollToBeta() {
-  document.getElementById("beta-interest")?.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [interest, setInterest] = useState<InterestChoice | "">("");
-  const [formMessage, setFormMessage] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<WorldCategory>("All");
   const [ageFilter, setAgeFilter] = useState<AgeFilter>("Any age");
   const [energyFilter, setEnergyFilter] = useState<EnergyFilter>("All energy");
@@ -123,26 +109,6 @@ export default function Home() {
     setSearchTerm("");
   };
 
-  const submitInterest = trpc.betaInterest.submit.useMutation({
-    onSuccess: result => {
-      if (result.status === "already_registered") {
-        setFormMessage("You are already on the private beta interest list.");
-        return;
-      }
-      setEmail("");
-      setInterest("");
-      setFormMessage("Thank you — your private beta interest has been received.");
-    },
-    onError: () => setFormMessage("We could not save your interest right now. Please try again shortly."),
-  });
-
-  const handleInterestSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setFormMessage(null);
-    if (!event.currentTarget.reportValidity()) return;
-    submitInterest.mutate({ email: email.trim(), interest: interest || undefined });
-  };
-
   const closeMenuAndScroll = (target: string) => {
     setMenuOpen(false);
     window.setTimeout(() => document.querySelector(target)?.scrollIntoView({ behavior: "smooth" }), 40);
@@ -155,18 +121,18 @@ export default function Home() {
         <nav className="map-nav" aria-label="Primary navigation">
           <a href="#worlds">Worlds</a><a href="/pilot">Live pilot</a><a href="#principles">Principles</a><a href="#how-it-works">How it works</a><a href="#faq">FAQ</a>
         </nav>
-        <div className="header-actions"><button type="button" className="login-quiet" onClick={scrollToBeta}>Private beta</button><button type="button" className="header-access" onClick={scrollToBeta}>Request access <ArrowUpRight size={14} /></button></div>
+        <div className="header-actions"><a className="login-quiet" href="/pilot">Private access</a><a className="header-access" href="/pilot">Start a thread <ArrowUpRight size={14} /></a></div>
         <button className="menu-button" type="button" aria-label="Open navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={21} /> : <Menu size={21} />}</button>
-        {menuOpen && <div className="mobile-menu"><button type="button" onClick={() => closeMenuAndScroll("#worlds")}>Worlds <ArrowDownRight size={16} /></button><button type="button" onClick={() => closeMenuAndScroll("#principles")}>Principles <ArrowDownRight size={16} /></button><button type="button" onClick={() => closeMenuAndScroll("#how-it-works")}>How it works <ArrowDownRight size={16} /></button><button type="button" className="mobile-menu-cta" onClick={() => closeMenuAndScroll("#beta-interest")}>Request beta access</button></div>}
+        {menuOpen && <div className="mobile-menu"><button type="button" onClick={() => closeMenuAndScroll("#worlds")}>Worlds <ArrowDownRight size={16} /></button><button type="button" onClick={() => closeMenuAndScroll("#principles")}>Principles <ArrowDownRight size={16} /></button><button type="button" onClick={() => closeMenuAndScroll("#how-it-works")}>How it works <ArrowDownRight size={16} /></button><a className="mobile-menu-cta" href="/pilot">Start a private thread</a></div>}
       </header>
 
       <main id="top">
         <section className="map-hero" aria-labelledby="hero-title">
-          <div className="hero-copy-map"><p className="map-kicker"><span />Private beta · In development</p><h1 id="hero-title">Private companion worlds. <em>Your story, your memory, your control.</em></h1><p>A private adult AI companion experience for imaginative threads, distinct points of view, and memory that stays under your review.</p><div className="hero-map-actions"><button type="button" className="rose-button" onClick={scrollToBeta}>Request beta access <ArrowUpRight size={17} /></button><a href="#worlds">Explore worlds <ArrowDownRight size={16} /></a></div><small><LockKeyhole size={13} />Building deliberately before broad access.</small></div>
+          <div className="hero-copy-map"><p className="map-kicker"><span />Private access · Account-owned</p><h1 id="hero-title">Private companion worlds. <em>Your story, your memory, your control.</em></h1><p>A private adult AI companion experience for imaginative threads, distinct points of view, and memory that stays under your review.</p><div className="hero-map-actions"><a className="rose-button" href="/pilot">Start a private thread <ArrowUpRight size={17} /></a><a href="#worlds">Explore worlds <ArrowDownRight size={16} /></a></div><small><LockKeyhole size={13} />Sign in before a private thread begins.</small></div>
           <div className="hero-catalogue" aria-label="Companion world preview">
             <div className="catalogue-topline"><span>Tonight&apos;s directions</span><span>01—03</span></div>
             <div className="catalogue-cards">{companionWorlds.slice(0, 3).map(world => <div className={`mini-world mini-${world.tone}`} key={world.name}><WorldMedia world={world} variant="mini" /><div className="mini-world-copy"><span>{world.category}</span><strong>{world.name.split(" ")[0]}</strong><p>{world.tag}</p></div></div>)}</div>
-            <button type="button" className="catalogue-foot" onClick={scrollToBeta}><Sparkles size={15} />Find your starting point <ArrowUpRight size={14} /></button>
+            <a className="catalogue-foot" href="/pilot"><Sparkles size={15} />Open private access <ArrowUpRight size={14} /></a>
           </div>
         </section>
 
@@ -181,11 +147,11 @@ export default function Home() {
               <a className="catalog-rail-link active" href="#worlds"><span>01</span>Discover worlds</a>
               <a className="catalog-rail-link" href="#how-it-works"><span>02</span>How threads work</a>
               <a className="catalog-rail-link" href="#principles"><span>03</span>Your controls</a>
-              <div className="catalog-rail-note"><span>Private beta</span><strong>{companionWorlds.length} fictional adult worlds</strong><p>Portrait worlds and CSS-only abstract previews share one adult-only discovery library.</p></div>
+              <div className="catalog-rail-note"><span>Private access</span><strong>{companionWorlds.length} fictional adult worlds</strong><p>Portrait worlds and CSS-only abstract previews share one adult-only discovery library.</p></div>
             </aside>
             <div className="catalog-content">
               <div className="library-heading"><div><p className="map-kicker"><span />Companion worlds</p><h2 id="worlds-title">Find a direction.<br /><em>Follow the thread.</em></h2></div><p>Each world begins with a point of view, a first line, and a setting that can grow with your choices.</p></div>
-              <div className="catalog-banner"><div><span>Tonight&apos;s directions</span><h3>A living library<br />of fictional worlds.</h3><p>A new branded collection image can replace this color story whenever it is ready.</p></div><div className="catalog-banner-orbits" aria-hidden="true"><i /><i /><i /></div><button type="button" onClick={scrollToBeta}>Explore your match <ArrowUpRight size={15} /></button></div>
+              <div className="catalog-banner"><div><span>Tonight&apos;s directions</span><h3>A living library<br />of fictional worlds.</h3><p>Choose a world, then open your private access space when you are ready.</p></div><div className="catalog-banner-orbits" aria-hidden="true"><i /><i /><i /></div><a href="/pilot">Open private access <ArrowUpRight size={15} /></a></div>
               <div className="catalog-commandbar" aria-label="Search and filter companion worlds">
                 <div className="search-wrap"><Search size={17} /><input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search names, worlds, or energy" aria-label="Search companion worlds" /></div>
                 <div className="filter-select"><label htmlFor="world-type">World</label><select id="world-type" value={activeCategory} onChange={event => setActiveCategory(event.target.value as WorldCategory)}>{categories.map(category => <option key={category} value={category}>{category === "All" ? "All worlds" : category}</option>)}</select><ChevronDown size={15} /></div>
@@ -194,7 +160,7 @@ export default function Home() {
               </div>
               <div className="catalog-category-row" aria-label="Quick world filters">{categories.map(category => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category === "All" ? "All worlds" : category}</button>)}<span className="world-count"><SlidersHorizontal size={15} />{visibleWorlds.length} of {companionWorlds.length} worlds</span></div>
               <div className="world-grid-map">
-                {visibleWorlds.map(world => <button className={`companion-card tone-${world.tone}`} type="button" key={world.name} onClick={scrollToBeta} aria-label={`Request private beta access for ${world.name}, a fictional adult AI companion world`}><WorldMedia world={world} /><span className="companion-overlay"><span className="companion-overlay-meta"><span>{world.category} world</span><span>{world.age} · adult</span></span><strong>{world.name}</strong><span className="companion-overlay-tagline">{world.tag}</span>{world.art && <span className="companion-overlay-state">CSS-only preview</span>}</span></button>)}
+                {visibleWorlds.map(world => <a className={`companion-card tone-${world.tone}`} href="/pilot" key={world.name} aria-label={`Open private access for ${world.name}, a fictional adult AI companion world`}><WorldMedia world={world} /><span className="companion-overlay"><span className="companion-overlay-meta"><span>{world.category} world</span><span>{world.age} · adult</span></span><strong>{world.name}</strong><span className="companion-overlay-tagline">{world.tag}</span>{world.art && <span className="companion-overlay-state">CSS-only preview</span>}</span></a>)}
               </div>
               {visibleWorlds.length === 0 && <div className="no-worlds"><MoonStar size={22} /><p>No world matches that combination yet.</p><button type="button" onClick={clearWorldFilters}>Clear all filters</button></div>}
             </div>
@@ -203,16 +169,16 @@ export default function Home() {
 
         <section className="how-map" id="how-it-works" aria-labelledby="how-title"><div><p className="map-kicker"><span />A deliberate way in</p><h2 id="how-title">Start with a world.<br /><em>Shape what follows.</em></h2></div><div className="how-steps-map"><article><span>01</span><h3>Choose a world</h3><p>Begin with a voice, setting, and first line that feels right for the moment.</p></article><article><span>02</span><h3>Build your thread</h3><p>Let the conversation develop in its own rhythm through a considered character world.</p></article><article><span>03</span><h3>Your memory, your rules</h3><p>Review the details that may carry forward, then keep, edit, or remove them on your terms.</p></article></div></section>
 
-        <section className="beta-band" aria-labelledby="beta-band-title"><div className="beta-band-figures" aria-hidden="true"><div className="band-figure band-one" /><div className="band-figure band-two" /><div className="band-figure band-three" /></div><div className="beta-band-copy"><p className="map-kicker"><span />Private, considered, yours</p><h2 id="beta-band-title">Build a world<br /><em>around your thread.</em></h2><p>The early MyGF.ai experience is being shaped with a limited group of adults. Leave your interest and help us make the boundaries as intentional as the worlds.</p><button type="button" className="rose-button" onClick={scrollToBeta}>Request beta access <ArrowUpRight size={17} /></button></div></section>
+        <section className="beta-band" aria-labelledby="beta-band-title"><div className="beta-band-figures" aria-hidden="true"><div className="band-figure band-one" /><div className="band-figure band-two" /><div className="band-figure band-three" /></div><div className="beta-band-copy"><p className="map-kicker"><span />Private, considered, yours</p><h2 id="beta-band-title">Build a world<br /><em>around your thread.</em></h2><p>Start with an account-owned space, choose a world, and keep the controls clear from the first message.</p><a className="rose-button" href="/pilot">Open private access <ArrowUpRight size={17} /></a></div></section>
 
         <section className="faq-map" id="faq" aria-labelledby="faq-title"><p className="map-kicker"><span />Clear answers</p><h2 id="faq-title">A private world should<br /><em>be easy to understand.</em></h2><div className="faq-list">{faqs.map((faq, index) => <details key={faq.question} open={index === 0}><summary>{faq.question}<ChevronDown size={18} /></summary><p>{faq.answer}</p></details>)}</div></section>
 
         <section className="editorial-map" aria-labelledby="editorial-title"><p className="map-kicker"><span />Built deliberately</p><h2 id="editorial-title">More room for imagination.<br /><em>More clarity around control.</em></h2><div className="editorial-copy"><h3>Distinct worlds, not generic profiles.</h3><p>MyGF.ai is being designed around companion worlds with a clear atmosphere and point of view. The product is not trying to imply a person is behind the screen; it is building a more intentional way to explore a fictional conversational setting.</p><h3>Memory, reviewed—not assumed.</h3><p>Continuity can make a thread richer, but it should remain visible and manageable. The intended experience puts people in charge of the details they choose to carry forward.</p><h3>An adult experience with a clear signal.</h3><p>MyGF.ai is for adults. It is not therapy, not human, and not a replacement for people. That clarity is a product feature, not a footnote.</p></div></section>
 
-        <section className="beta-form-map" id="beta-interest" aria-labelledby="form-title"><div><p className="map-kicker"><span />Private beta applications</p><h2 id="form-title">Leave your interest.<br /><em>We will keep it private.</em></h2><p>We are inviting a limited group of adults to help shape the first worlds. Your email is used only to follow up about the beta.</p></div><form onSubmit={handleInterestSubmit} noValidate><label htmlFor="interest-email">Email address</label><input id="interest-email" name="email" type="email" placeholder="you@example.com" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required /><label htmlFor="interest-draw">What draws you here <span>optional</span></label><div className="select-wrap"><select id="interest-draw" name="interest" value={interest} onChange={event => setInterest(event.target.value as InterestChoice | "")}><option value="">Choose an answer</option><option value="story/character continuity">story/character continuity</option><option value="reflective conversation">reflective conversation</option><option value="imaginative roleplay">imaginative roleplay</option><option value="curious about AI">curious about AI</option></select><ChevronDown size={17} aria-hidden="true" /></div><button className="rose-button form-submit" type="submit" disabled={submitInterest.isPending}>{submitInterest.isPending ? "Saving your interest…" : <>Request beta access <ArrowUpRight size={17} /></>}</button><p className="form-note"><LockKeyhole size={13} />Your interest is private. We will only use this email to follow up about the beta.</p>{formMessage && <p className="form-message" role="status" aria-live="polite">{formMessage}</p>}</form></section>
+        <section className="beta-form-map" id="private-access" aria-labelledby="form-title"><div><p className="map-kicker"><span />Private access</p><h2 id="form-title">A thread begins<br /><em>with clear control.</em></h2><p>Private threads are account-owned. Sign in first, select your room context, and confirm that you are an adult before conversation begins.</p></div><div className="live-access-card"><LockKeyhole size={22} /><h3>Sign in to begin privately.</h3><p>Authentication protects thread ownership, user controls, reporting, and the per-account message limit. It is not a beta application.</p><a className="rose-button" href="/pilot">Continue to private access <ArrowUpRight size={17} /></a></div></section>
       </main>
 
-      <footer className="map-footer"><div className="footer-lead"><a className="map-brand" href="#top"><span className="brand-mark" aria-hidden="true"><span /></span><span>mygf<span>.ai</span></span></a><p>Private companion worlds, built with care and clear boundaries.</p><small>Adult AI companion experience · Not therapy · Not human</small></div><div><h3>Explore</h3><a href="#worlds">Worlds</a><a href="#how-it-works">How it works</a><a href="#beta-interest">Private beta</a></div><div><h3>Principles</h3><a href="#principles">AI, always clearly</a><a href="#principles">Memory you control</a><a href="#principles">Private by design</a></div><div><h3>More</h3><a href="#faq">FAQ</a><a href="#beta-interest">Beta interest</a><a href="#top">Back to top <CircleArrowDown size={13} /></a></div></footer>
+      <footer className="map-footer"><div className="footer-lead"><a className="map-brand" href="#top"><span className="brand-mark" aria-hidden="true"><span /></span><span>mygf<span>.ai</span></span></a><p>Private companion worlds, built with care and clear boundaries.</p><small>Adult AI companion experience · Not therapy · Not human</small></div><div><h3>Explore</h3><a href="#worlds">Worlds</a><a href="#how-it-works">How it works</a><a href="/pilot">Private access</a></div><div><h3>Principles</h3><a href="#principles">AI, always clearly</a><a href="#principles">Memory you control</a><a href="#principles">Private by design</a></div><div><h3>More</h3><a href="#faq">FAQ</a><a href="/pilot">Start a thread</a><a href="#top">Back to top <CircleArrowDown size={13} /></a></div></footer>
     </div>
   );
 }

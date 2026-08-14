@@ -91,6 +91,14 @@
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.pilot-access-shell { min-height: 100vh; }
+.pilot-access-gate { width: min(720px, calc(100% - 48px)); margin: 0 auto; padding: clamp(96px, 17vh, 178px) 0 100px; }
+.pilot-access-gate h1 { max-width: 680px; margin: 0 0 22px; font-size: clamp(3rem, 7vw, 5.9rem); font-weight: 600; letter-spacing: -.082em; line-height: .91; }
+.pilot-access-gate h1 em { color: #eadbff; font-weight: 400; }
+.pilot-access-gate > p:not(.map-kicker) { max-width: 600px; color: #bdb0c4; font-size: 15px; line-height: 1.75; }
+.pilot-access-gate .rose-button { margin-top: 28px; text-decoration: none; }
+.pilot-access-gate small { display: flex; align-items: center; gap: 6px; margin-top: 18px; color: #938598; font-size: 11px; }
+
 @media (max-width: 800px) {
   .pilot-draft-form,
   .pilot-map-form {
@@ -100,4 +108,6 @@
   .pilot-wide-input {
     grid-column: auto;
   }
+
+  .pilot-access-gate { width: min(100% - 32px, 720px); padding-top: 92px; }
 }

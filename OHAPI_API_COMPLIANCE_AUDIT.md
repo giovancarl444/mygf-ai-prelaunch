@@ -2,11 +2,11 @@
 
 **Audit date:** 14 August 2026  
 **Official source:** [OhAPI API Documentation][1]  
-**Scope:** The MyGF.ai text-first controlled beta only. No provider character, room, message, image, audio, video, or digital-twin request was issued during this audit.
+**Scope:** The MyGF.ai text-first private-access implementation. No provider character, room, message, image, audio, video, or digital-twin content was created or changed during this audit.
 
 ## Current Operational State
 
-The application currently has one locally approved, provider-mapped companion: **Sienna Vale** (`sienna-vale`). The local system contains no active room, no stored message, no open private report, and no active rate-limit bucket. One retired local room remains as the record of the verified transcript-clear control. This local inventory does not query, alter, or promise to delete provider-retained records.
+The application currently has one locally approved, provider-mapped companion: **Sienna Vale** (`sienna-vale`, provider ID `21555`). A read-only customer-library request on 14 August 2026 confirmed that the authenticated provider account contains exactly one saved character. The local system contains no active room, no stored message, no open private report, and no active rate-limit bucket. One retired local room remains as the record of the verified transcript-clear control. This local inventory does not query, alter, or promise to delete provider-retained records.
 
 | Contract area | Required operating rule | Enforced project behavior |
 | --- | --- | --- |
@@ -24,11 +24,19 @@ The application currently has one locally approved, provider-mapped companion: *
 
 The owner interface now refreshes the provider status after a private candidate is generated and continues status checks after an explicit save request until it reaches a terminal result. The manual mapping control remains disabled unless the saved status and identifier match. The server repeats that check as the authoritative enforcement point, so a modified browser request cannot bypass it.
 
-## Deliberate Beta Boundaries
+## Sienna Identity Review Hold
 
-MyGF.ai currently uses the provider for the documented text-room path only. Images, audio, video, digital twins, provider job polling, and provider-hosted media retention are out of scope for this controlled beta. Any future media implementation must receive a separate design, storage, retention, and safety review before an endpoint is enabled.
+The existing provider mapping is technically valid, but it is **not sufficient to present Sienna as a completed public companion**. The saved provider candidate recorded during the original technical pilot was reviewed as a 28-year-old independent cultural editor, while the public page has used a separate 24-year-old bright/playful Sienna concept and supplied portrait. Those are not one identity-aligned approval record.
+
+The owner Studio now exposes this as an `identity_review_required` hold rather than concealing the discrepancy. The standalone `SIENNA_READINESS_STANDARD.md` defines the required final identity brief, visual-truthfulness review, representative-thread review, and owner sign-off. No replacement candidate is generated, saved, mapped, or published until the owner explicitly authorizes that provider-side work.
+
+## Deliberate Product Boundaries
+
+MyGF.ai currently uses the provider for the documented text-room path only. Images, audio, video, digital twins, provider job polling, and provider-hosted media retention are out of scope. Any future media implementation must receive a separate design, storage, retention, and safety review before an endpoint is enabled.
 
 The local **Clear** action retires the MyGF.ai room and removes its local transcript. It does not represent a provider-side deletion request, because the existing text beta does not assume such a provider deletion contract. This distinction remains visible in the product.
+
+The public page no longer collects beta-interest applications or describes access as a private-beta request. It now routes visitors to an explicit branded private-account gate. Selecting **Sign in to continue** starts the existing OAuth flow only after the visitor has been told why account ownership is required for rooms, transcript controls, reporting, and per-account limits.
 
 ## Owner Studio and Playground Separation
 
@@ -40,7 +48,7 @@ The submitted `tools/oh-api-playground/` package remains a separately buildable,
 
 ## Verification Record
 
-The combined contract and Studio hardening was validated by TypeScript compilation, independent production builds for the main application and isolated playground, desktop/mobile Studio review, authorization and package-isolation tests, and the deterministic suite: **28 passing tests and one intentionally skipped live-network credential probe**. The skipped probe is gated behind `RUN_OHAPI_LIVE_TESTS=true` to prevent routine test runs from accessing the provider.
+The combined contract, Studio, and live-access hardening was validated by TypeScript compilation, a production build, desktop/mobile review, a read-only authenticated customer-library refresh, authorization and package-isolation tests, and the deterministic suite: **30 passing tests and one intentionally skipped live-network credential probe**. The skipped probe is gated behind `RUN_OHAPI_LIVE_TESTS=true` to prevent routine test runs from accessing the provider.
 
 ## References
 
