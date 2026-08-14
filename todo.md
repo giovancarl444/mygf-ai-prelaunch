@@ -24,9 +24,9 @@
 - [x] Rebuild the landing page to the supplied reference map while preserving beta-interest persistence, notifications, trust boundaries, and accessibility.
 - [x] Verify desktop/mobile fidelity, beta-interest behavior, tests, and production build against the reference map.
 - [x] Save the full reference-map implementation as a new recovery checkpoint.
-- [ ] Save and verify a dedicated pre-media recovery baseline before integrating companion portraits.
-- [ ] Define six clearly adult fictional companion profiles, including names, ages of 21+, and concise personality anchors.
-- [ ] Prepare the six supplied portraits for managed web delivery and map each image to its fictional companion card.
-- [ ] Update the discovery catalog and featured surfaces with the six real-media companion cards while preserving AI disclosure and trust boundaries.
-- [ ] Verify desktop/mobile media presentation, card content, beta-interest behavior, and build health.
+- [x] Save and verify a dedicated pre-media recovery baseline before integrating companion portraits.
+- [x] Define six clearly adult fictional companion profiles, including names, ages of 21+, and concise personality anchors.
+- [x] Prepare the six supplied portraits for managed web delivery and map each image to its fictional companion card.
+- [x] Update the discovery catalog and featured surfaces with the six real-media companion cards while preserving AI disclosure and trust boundaries.
+- [x] Verify desktop/mobile media presentation, card content, beta-interest behavior, and build health.
 - [ ] Save the companion-media implementation as a recoverable checkpoint.
