@@ -1,8 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
-  betaInterests,
-  InsertBetaInterest,
   InsertUser,
   users,
 } from "../drizzle/schema";
@@ -71,15 +69,4 @@ export async function getUserByOpenId(openId: string) {
   return result[0];
 }
 
-export async function findBetaInterestByEmail(email: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is unavailable");
-  const result = await db.select().from(betaInterests).where(eq(betaInterests.email, email)).limit(1);
-  return result[0];
-}
 
-export async function createBetaInterest(input: InsertBetaInterest) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is unavailable");
-  await db.insert(betaInterests).values(input);
-}

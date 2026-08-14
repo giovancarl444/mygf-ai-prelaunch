@@ -7,6 +7,9 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["admin", "user"]).default("user").notNull(),
+  // Server-side record of the adult acknowledgement. The browser checkbox is a
+  // presentation of this value, never the enforcement point.
+  adultConfirmedAt: timestamp("adultConfirmedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -25,23 +28,40 @@ export const betaInterests = mysqlTable("beta_interests", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+/**
+ * Local registry of provider characters. Rows are synced from
+ * `GET /api/v1/characters` so the public catalog reflects what can actually be
+ * talked to, rather than hand-authored marketing entries.
+ */
 export const ohapiCharacters = mysqlTable("ohapi_characters", {
   id: int("id").autoincrement().primaryKey(),
   worldSlug: varchar("worldSlug", { length: 120 }).notNull().unique(),
   displayName: varchar("displayName", { length: 160 }).notNull(),
   providerCharacterId: varchar("providerCharacterId", { length: 128 }).unique(),
   status: mysqlEnum("status", ["draft", "approved", "disabled"]).default("draft").notNull(),
+  // Owner curation. A synced character is only publicly listed when published.
+  visibility: mysqlEnum("visibility", ["published", "hidden"]).default("published").notNull(),
+  age: int("age"),
+  occupation: varchar("occupation", { length: 160 }),
+  profileImageUrl: varchar("profileImageUrl", { length: 1024 }),
+  tagline: varchar("tagline", { length: 240 }),
+  providerType: mysqlEnum("providerType", ["ORIGINAL", "DIGITAL_TWIN"]),
+  syncedAt: timestamp("syncedAt"),
   approvedAt: timestamp("approvedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => ({
+  visibilityIndex: index("ohapi_characters_visibility_index").on(table.visibility, table.status),
+}));
 
 export const ohapiRooms = mysqlTable("ohapi_rooms", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
   ohapiCharacterId: int("ohapiCharacterId").notNull().references(() => ohapiCharacters.id),
   providerRoomId: varchar("providerRoomId", { length: 160 }).notNull().unique(),
-  userGender: mysqlEnum("userGender", ["male", "female"]).notNull(),
+  // Local preference metadata only. `POST /api/v1/rooms` documents a single
+  // `character_id` field, so neither value is sent to the provider.
+  userGender: mysqlEnum("userGender", ["male", "female"]),
   textingStyle: mysqlEnum("textingStyle", ["default", "short-form", "long-form"]).default("default").notNull(),
   title: varchar("title", { length: 120 }),
   deletedAt: timestamp("deletedAt"),
@@ -65,16 +85,23 @@ export const ohapiMessages = mysqlTable("ohapi_messages", {
 
 export const ohapiMediaJobs = mysqlTable("ohapi_media_jobs", {
   id: int("id").autoincrement().primaryKey(),
+  // Ownership is required: a job may only be polled by the account that created
+  // it. Without this a job id is a bearer token for someone else's media.
+  userId: int("userId").notNull().references(() => users.id),
+  ohapiCharacterId: int("ohapiCharacterId").references(() => ohapiCharacters.id),
   roomId: int("roomId").references(() => ohapiRooms.id),
   providerJobId: varchar("providerJobId", { length: 160 }).notNull().unique(),
   kind: mysqlEnum("kind", ["image", "audio", "video"]).notNull(),
   status: mysqlEnum("status", ["pending", "completed", "failed", "expired"]).default("pending").notNull(),
+  prompt: varchar("prompt", { length: 1200 }),
   resultKey: varchar("resultKey", { length: 512 }),
+  resultUrl: varchar("resultUrl", { length: 2048 }),
   errorMessage: text("errorMessage"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => ({
   roomIndex: index("ohapi_media_jobs_room_index").on(table.roomId),
+  userCreatedIndex: index("ohapi_media_jobs_user_created_index").on(table.userId, table.createdAt),
 }));
 
 export const ohapiReports = mysqlTable("ohapi_reports", {

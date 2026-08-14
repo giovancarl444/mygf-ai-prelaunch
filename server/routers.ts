@@ -1,9 +1,10 @@
 import { COOKIE_NAME } from "@shared/const";
-import { betaInterestInputSchema, submitBetaInterest } from "./betaInterest";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { ohapiPilotRouter } from "./ohapiPilot";
+import { ohapiChatRouter } from "./ohapiChat";
+import { ohapiCompanionsRouter } from "./ohapiCompanions";
+import { ohapiMediaRouter } from "./ohapiMedia";
 import { ohapiStudioRouter } from "./ohapiStudio";
 
 export const appRouter = router({
@@ -16,10 +17,12 @@ export const appRouter = router({
       return { success: true } as const;
     }),
   }),
-  betaInterest: router({
-    submit: publicProcedure.input(betaInterestInputSchema).mutation(({ input }) => submitBetaInterest(input)),
-  }),
-  ohapiPilot: ohapiPilotRouter,
+  // Public discovery: every listed companion is one the provider can actually open.
+  companions: ohapiCompanionsRouter,
+  // Account-owned conversation and generation.
+  chat: ohapiChatRouter,
+  media: ohapiMediaRouter,
+  // Owner-only operations, reachable exclusively from /ops/ohapi.
   ohapiStudio: ohapiStudioRouter,
 });
 

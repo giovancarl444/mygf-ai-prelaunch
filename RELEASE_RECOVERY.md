@@ -87,3 +87,55 @@ The live-access transition is preserved in project checkpoint **`627ccb6f`**. It
 This checkpoint also records the verified Sienna state: the provider account contains one saved character, and the local mapping points `sienna-vale` to provider ID `21555`; however, the existing provider identity is not yet aligned with the public Sienna concept. The owner Studio therefore displays an explicit **identity review required** hold. `SIENNA_READINESS_STANDARD.md` defines the required final identity, visual, and representative-thread approvals. No provider character or content was generated, saved, mapped, or published during this transition.
 
 The corresponding immutable source references are **`backup/live-access-sienna-readiness-20260814`** and **`recovery/live-access-sienna-readiness-20260814`**. Restore checkpoint **`9aea73c3`** to return to the prior Studio consolidation before the public live-access and Sienna-readiness corrections.
+
+## Provider-Backed Companion Product
+
+The technical pilot was replaced with a companion product whose catalog is
+derived from the provider library.
+
+**Rollback target:** restore checkpoint / branch `recovery/live-access-sienna-readiness-20260814`
+(`eb8003a`) to return to the pre-rebuild landing page and `/pilot` surface.
+
+What changed:
+
+- `server/ohapi.ts` was corrected against the published documentation. The chat
+  call previously posted `{ room_id, prompt }`; the documented contract is
+  `{ room_id, character_id, message }`. Room creation previously sent
+  `user_gender` and `texting_style`, which the documented contract does not
+  define. `server/ohapiContract.test.ts` now locks every request shape.
+- The public catalog is synced from `GET /api/v1/characters` into
+  `ohapi_characters` rather than hard-coded in the client. Eighteen fictional
+  entries, of which one had a provider mapping, were removed.
+- Clicking a companion now opens that companion. Routes are `/companion/:slug`
+  and `/chat/:slug`; `/pilot` is removed and redirects to `/companions`.
+- Image, audio, and video generation were implemented as typed server-mediated
+  operations with per-account ownership on every job.
+- Adult confirmation moved from a browser checkbox to a stored account timestamp
+  enforced by `server/ohapiAccess.ts` on every generative request.
+- The message allowance is consumed before a provider room is created, and room
+  creation is separately bounded, closing the unbounded clear-then-send loop.
+- Owner companion-creation controls moved off the customer page into `/ops/ohapi`.
+- The unused public `betaInterest.submit` endpoint was removed.
+
+Migration `drizzle/0007_flippant_the_spike.sql` adds adult confirmation, companion
+registry metadata, and media-job ownership. `ohapi_media_jobs.userId` is added
+`NOT NULL`; this is safe because no code path ever wrote to that table.
+
+Superseded documents removed in this change: `OHAPI_API_COMPLIANCE_AUDIT.md`,
+`SIENNA_READINESS_STANDARD.md`, `LIVE_ACCESS_AUDIT.md`, `BETA_PILOT_GUARDRAILS.md`,
+`CATALOG_ARCHITECTURE.md`, `COMPACT_CARD_CORRECTION.md`, `COMPANION_ROSTER.md`,
+`HIGH_DENSITY_CATALOG_TRANSLATION.md`, `REFERENCE_MAP_IMPLEMENTATION.md`, and
+`TRANSPARENT_OVERLAY_CATALOG_CORRECTION.md`. They described a landing page and
+pilot surface that no longer exist, and three of them stated mutually
+contradictory rules for the same card treatment. They remain recoverable from Git
+history. `OHAPI_INTEGRATION.md` and `PRODUCT_MODEL.md` replace them.
+
+### Repository reference correction
+
+`git ls-remote origin` resolves this repository to
+`https://github.com/giovancarl444/mygf-ai-prelaunch`, not the
+`limitlessaiel/mygf-ai-prelaunch` recorded in the earlier entries above and in
+`GITHUB_BACKUP_OPERATING_STANDARD.md`. All 15 `backup/*` tags, 12 `recovery/*`
+branches, and `release/published-20260814` were verified present on that remote.
+The historical entries are left unedited; whether this reflects a rename or a
+mistaken record needs owner confirmation.

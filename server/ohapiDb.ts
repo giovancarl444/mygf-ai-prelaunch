@@ -1,12 +1,14 @@
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   ohapiAdminAudits,
-  InsertOhapiCharacter,
   ohapiCharacters,
+  ohapiMediaJobs,
   ohapiMessages,
   ohapiRateLimits,
   ohapiReports,
   ohapiRooms,
+  users,
+  type OhapiCharacter,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -16,37 +18,183 @@ async function requireDb() {
   return db;
 }
 
-export async function listApprovedOhapiCharacters() {
-  const db = await requireDb();
-  return db.select().from(ohapiCharacters).where(eq(ohapiCharacters.status, "approved"));
+/* -------------------------------------------------------------------------- */
+/* Companion registry                                                          */
+/* -------------------------------------------------------------------------- */
+
+export function slugifyCompanionName(name: string, providerCharacterId: string) {
+  const base = name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  const suffix = providerCharacterId.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(-6);
+  return base ? `${base}-${suffix}` : `companion-${suffix}`;
 }
 
-export async function getApprovedOhapiCharacter(worldSlug: string) {
+export async function listPublishedOhapiCharacters() {
+  const db = await requireDb();
+  return db.select().from(ohapiCharacters).where(and(
+    eq(ohapiCharacters.status, "approved"),
+    eq(ohapiCharacters.visibility, "published"),
+  )).orderBy(asc(ohapiCharacters.displayName));
+}
+
+export async function listAllOhapiCharacters() {
+  const db = await requireDb();
+  return db.select().from(ohapiCharacters).orderBy(asc(ohapiCharacters.displayName));
+}
+
+export async function getPublishedOhapiCharacterBySlug(worldSlug: string) {
   const db = await requireDb();
   const rows = await db.select().from(ohapiCharacters).where(and(
     eq(ohapiCharacters.worldSlug, worldSlug),
     eq(ohapiCharacters.status, "approved"),
+    eq(ohapiCharacters.visibility, "published"),
   )).limit(1);
   return rows[0];
 }
 
-export async function upsertApprovedOhapiCharacter(input: Pick<InsertOhapiCharacter, "worldSlug" | "displayName" | "providerCharacterId">) {
+/** Chat resolves by slug; the slug is the public identifier of one companion. */
+export async function getChattableOhapiCharacter(worldSlug: string) {
+  return getPublishedOhapiCharacterBySlug(worldSlug);
+}
+
+async function getOhapiCharacterByProviderId(providerCharacterId: string) {
+  const db = await requireDb();
+  const rows = await db.select().from(ohapiCharacters)
+    .where(eq(ohapiCharacters.providerCharacterId, providerCharacterId)).limit(1);
+  return rows[0];
+}
+
+export async function getOhapiCharacterBySlug(worldSlug: string) {
+  const db = await requireDb();
+  const rows = await db.select().from(ohapiCharacters)
+    .where(eq(ohapiCharacters.worldSlug, worldSlug)).limit(1);
+  return rows[0];
+}
+
+export type SyncCharacterInput = {
+  providerCharacterId: string;
+  displayName: string;
+  age: number | null;
+  occupation: string | null;
+  profileImageUrl: string | null;
+  providerType: "ORIGINAL" | "DIGITAL_TWIN" | null;
+};
+
+/**
+ * Reconciles the local registry against the provider library.
+ *
+ * Keyed on `providerCharacterId` rather than `worldSlug`, because the provider
+ * id is the durable identity. Matching on the slug is what allowed an existing
+ * row to be silently repointed when two worlds resolved to one provider record.
+ */
+export async function syncOhapiCharacters(characters: readonly SyncCharacterInput[]) {
   const db = await requireDb();
   const now = new Date();
-  await db.insert(ohapiCharacters).values({
-    ...input,
-    status: "approved",
-    approvedAt: now,
-  }).onDuplicateKeyUpdate({
-    set: {
-      displayName: input.displayName,
-      providerCharacterId: input.providerCharacterId,
+  let created = 0;
+  let updated = 0;
+
+  for (const character of characters) {
+    const existing = await getOhapiCharacterByProviderId(character.providerCharacterId);
+
+    if (existing) {
+      await db.update(ohapiCharacters).set({
+        displayName: character.displayName,
+        age: character.age,
+        occupation: character.occupation,
+        profileImageUrl: character.profileImageUrl,
+        providerType: character.providerType,
+        status: "approved",
+        syncedAt: now,
+        approvedAt: existing.approvedAt ?? now,
+      }).where(eq(ohapiCharacters.id, existing.id));
+      updated += 1;
+      continue;
+    }
+
+    // Resolve a free slug. A collision here means a different provider record
+    // already owns the readable name, so the new row takes a distinct slug
+    // instead of overwriting the incumbent.
+    let worldSlug = slugifyCompanionName(character.displayName, character.providerCharacterId);
+    if (await getOhapiCharacterBySlug(worldSlug)) {
+      worldSlug = `${worldSlug}-${Date.now().toString(36).slice(-4)}`;
+    }
+
+    await db.insert(ohapiCharacters).values({
+      worldSlug,
+      displayName: character.displayName,
+      providerCharacterId: character.providerCharacterId,
+      age: character.age,
+      occupation: character.occupation,
+      profileImageUrl: character.profileImageUrl,
+      providerType: character.providerType,
       status: "approved",
+      visibility: "published",
+      syncedAt: now,
       approvedAt: now,
-    },
-  });
-  return getApprovedOhapiCharacter(input.worldSlug);
+    });
+    created += 1;
+  }
+
+  // Anything no longer present in the provider library must stop being offered.
+  const liveIds = characters.map(character => character.providerCharacterId);
+  const stale = liveIds.length
+    ? await db.select().from(ohapiCharacters).where(and(
+        eq(ohapiCharacters.status, "approved"),
+        sql`${ohapiCharacters.providerCharacterId} NOT IN (${sql.join(liveIds.map(id => sql`${id}`), sql`, `)})`,
+      ))
+    : await db.select().from(ohapiCharacters).where(eq(ohapiCharacters.status, "approved"));
+
+  if (stale.length) {
+    await db.update(ohapiCharacters)
+      .set({ status: "disabled", visibility: "hidden" })
+      .where(inArray(ohapiCharacters.id, stale.map(row => row.id)));
+  }
+
+  return { created, updated, retired: stale.length, total: characters.length };
 }
+
+export async function setOhapiCharacterVisibility(input: { worldSlug: string; visibility: "published" | "hidden" }) {
+  const db = await requireDb();
+  const existing = await getOhapiCharacterBySlug(input.worldSlug);
+  if (!existing) return null;
+  await db.update(ohapiCharacters).set({ visibility: input.visibility }).where(eq(ohapiCharacters.id, existing.id));
+  return getOhapiCharacterBySlug(input.worldSlug);
+}
+
+export async function setOhapiCharacterTagline(input: { worldSlug: string; tagline: string | null }) {
+  const db = await requireDb();
+  const existing = await getOhapiCharacterBySlug(input.worldSlug);
+  if (!existing) return null;
+  await db.update(ohapiCharacters).set({ tagline: input.tagline }).where(eq(ohapiCharacters.id, existing.id));
+  return getOhapiCharacterBySlug(input.worldSlug);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Adult confirmation                                                          */
+/* -------------------------------------------------------------------------- */
+
+export async function markUserAdultConfirmed(userId: number) {
+  const db = await requireDb();
+  const now = new Date();
+  await db.update(users).set({ adultConfirmedAt: now }).where(eq(users.id, userId));
+  return now;
+}
+
+export async function getUserAdultConfirmedAt(userId: number) {
+  const db = await requireDb();
+  const rows = await db.select({ adultConfirmedAt: users.adultConfirmedAt })
+    .from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0]?.adultConfirmedAt ?? null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Rooms, messages, reports                                                    */
+/* -------------------------------------------------------------------------- */
 
 export async function getOwnedOhapiRoom(input: { userId: number; ohapiCharacterId: number }) {
   const db = await requireDb();
@@ -72,14 +220,57 @@ export async function createOwnedOhapiRoom(input: {
   userId: number;
   ohapiCharacterId: number;
   providerRoomId: string;
-  userGender: "male" | "female";
-  textingStyle: "default" | "short-form" | "long-form";
+  textingStyle?: "default" | "short-form" | "long-form";
 }) {
   const db = await requireDb();
-  await db.insert(ohapiRooms).values(input);
+  await db.insert(ohapiRooms).values({
+    userId: input.userId,
+    ohapiCharacterId: input.ohapiCharacterId,
+    providerRoomId: input.providerRoomId,
+    textingStyle: input.textingStyle ?? "default",
+  });
   const room = await getOwnedOhapiRoom(input);
   if (!room) throw new Error("The new conversation room could not be loaded.");
   return room;
+}
+
+/** Live rooms an account currently holds. Bounds provider-side room creation. */
+export async function countLiveOhapiRooms(userId: number) {
+  const db = await requireDb();
+  const rows = await db.select({ total: sql<number>`count(*)` }).from(ohapiRooms).where(and(
+    eq(ohapiRooms.userId, userId),
+    isNull(ohapiRooms.deletedAt),
+  ));
+  return Number(rows[0]?.total ?? 0);
+}
+
+/** Rooms created in the current UTC hour, including retired ones. */
+export async function countOhapiRoomsCreatedThisHour(userId: number, now = new Date()) {
+  const db = await requireDb();
+  const hourStart = new Date(now);
+  hourStart.setUTCMinutes(0, 0, 0);
+  const rows = await db.select({ total: sql<number>`count(*)` }).from(ohapiRooms).where(and(
+    eq(ohapiRooms.userId, userId),
+    sql`${ohapiRooms.createdAt} >= ${hourStart}`,
+  ));
+  return Number(rows[0]?.total ?? 0);
+}
+
+export async function listOwnedOhapiRooms(userId: number) {
+  const db = await requireDb();
+  return db.select({
+    id: ohapiRooms.id,
+    title: ohapiRooms.title,
+    lastUsedAt: ohapiRooms.lastUsedAt,
+    worldSlug: ohapiCharacters.worldSlug,
+    displayName: ohapiCharacters.displayName,
+    profileImageUrl: ohapiCharacters.profileImageUrl,
+  })
+    .from(ohapiRooms)
+    .innerJoin(ohapiCharacters, eq(ohapiRooms.ohapiCharacterId, ohapiCharacters.id))
+    .where(and(eq(ohapiRooms.userId, userId), isNull(ohapiRooms.deletedAt)))
+    .orderBy(desc(ohapiRooms.lastUsedAt))
+    .limit(50);
 }
 
 export async function touchOhapiRoom(roomId: number) {
@@ -100,6 +291,7 @@ export async function clearOwnedOhapiRoom(input: { userId: number; roomId: numbe
   const room = await getOwnedOhapiRoomById(input);
   if (!room) return false;
   await db.update(ohapiReports).set({ messageId: null }).where(eq(ohapiReports.roomId, room.id));
+  await db.update(ohapiMediaJobs).set({ roomId: null }).where(eq(ohapiMediaJobs.roomId, room.id));
   await db.delete(ohapiMessages).where(eq(ohapiMessages.roomId, room.id));
   await db.update(ohapiRooms).set({ deletedAt: new Date(), title: null }).where(eq(ohapiRooms.id, room.id));
   return true;
@@ -107,7 +299,7 @@ export async function clearOwnedOhapiRoom(input: { userId: number; roomId: numbe
 
 export async function listOwnedOhapiMessages(roomId: number) {
   const db = await requireDb();
-  return db.select().from(ohapiMessages).where(eq(ohapiMessages.roomId, roomId)).orderBy(asc(ohapiMessages.createdAt)).limit(100);
+  return db.select().from(ohapiMessages).where(eq(ohapiMessages.roomId, roomId)).orderBy(asc(ohapiMessages.createdAt)).limit(200);
 }
 
 export async function createOhapiMessage(input: {
@@ -155,17 +347,106 @@ export async function createOhapiReport(input: {
   return true;
 }
 
-export const HOURLY_TEXT_LIMIT = 8;
+/* -------------------------------------------------------------------------- */
+/* Media jobs                                                                  */
+/* -------------------------------------------------------------------------- */
 
-export function describeOhapiTextAllowance(used: number, now = new Date()) {
-  const resetAt = new Date(now);
-  resetAt.setUTCHours(resetAt.getUTCHours() + 1, 0, 0, 0);
-  return { allowed: used <= HOURLY_TEXT_LIMIT, used, remaining: Math.max(0, HOURLY_TEXT_LIMIT - used), resetAt };
+export async function createOhapiMediaJob(input: {
+  userId: number;
+  ohapiCharacterId?: number | null;
+  roomId?: number | null;
+  providerJobId: string;
+  kind: "image" | "audio" | "video";
+  prompt?: string | null;
+  resultUrl?: string | null;
+}) {
+  const db = await requireDb();
+  await db.insert(ohapiMediaJobs).values({
+    userId: input.userId,
+    ohapiCharacterId: input.ohapiCharacterId ?? null,
+    roomId: input.roomId ?? null,
+    providerJobId: input.providerJobId,
+    kind: input.kind,
+    status: "pending",
+    prompt: input.prompt?.slice(0, 1_200) ?? null,
+    resultUrl: input.resultUrl ?? null,
+  });
+  return getOwnedOhapiMediaJob({ userId: input.userId, providerJobId: input.providerJobId });
 }
 
-export async function consumeOhapiTextAllowance(userId: number, now = new Date()) {
+export async function getOwnedOhapiMediaJob(input: { userId: number; providerJobId: string }) {
   const db = await requireDb();
-  const bucketKey = now.toISOString().slice(0, 13);
+  const rows = await db.select().from(ohapiMediaJobs).where(and(
+    eq(ohapiMediaJobs.providerJobId, input.providerJobId),
+    eq(ohapiMediaJobs.userId, input.userId),
+  )).limit(1);
+  return rows[0];
+}
+
+export async function updateOhapiMediaJob(input: {
+  id: number;
+  status: "pending" | "completed" | "failed" | "expired";
+  resultUrl?: string | null;
+  errorMessage?: string | null;
+}) {
+  const db = await requireDb();
+  await db.update(ohapiMediaJobs).set({
+    status: input.status,
+    resultUrl: input.resultUrl ?? null,
+    errorMessage: input.errorMessage ?? null,
+  }).where(eq(ohapiMediaJobs.id, input.id));
+}
+
+export async function listOwnedOhapiMediaJobs(input: { userId: number; ohapiCharacterId?: number }) {
+  const db = await requireDb();
+  const filters = [eq(ohapiMediaJobs.userId, input.userId)];
+  if (typeof input.ohapiCharacterId === "number") {
+    filters.push(eq(ohapiMediaJobs.ohapiCharacterId, input.ohapiCharacterId));
+  }
+  return db.select().from(ohapiMediaJobs).where(and(...filters))
+    .orderBy(desc(ohapiMediaJobs.createdAt)).limit(60);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Rate limiting                                                               */
+/* -------------------------------------------------------------------------- */
+
+export const HOURLY_TEXT_LIMIT = 60;
+export const HOURLY_MEDIA_LIMIT = 12;
+export const HOURLY_ROOM_LIMIT = 12;
+export const MAX_LIVE_ROOMS = 40;
+
+export type RateScope = "text" | "media";
+
+export function describeOhapiAllowance(used: number, limit: number, now = new Date()) {
+  const resetAt = new Date(now);
+  resetAt.setUTCHours(resetAt.getUTCHours() + 1, 0, 0, 0);
+  return { allowed: used <= limit, used, limit, remaining: Math.max(0, limit - used), resetAt };
+}
+
+/** Back-compat alias retained for the existing deterministic allowance tests. */
+export function describeOhapiTextAllowance(used: number, now = new Date()) {
+  return describeOhapiAllowance(used, HOURLY_TEXT_LIMIT, now);
+}
+
+function bucketKeyFor(scope: RateScope, now: Date) {
+  return `${scope}:${now.toISOString().slice(0, 13)}`;
+}
+
+/** Reads the current usage without consuming an attempt. */
+export async function peekOhapiAllowance(userId: number, scope: RateScope, limit: number, now = new Date()) {
+  const db = await requireDb();
+  const rows = await db.select().from(ohapiRateLimits).where(and(
+    eq(ohapiRateLimits.userId, userId),
+    eq(ohapiRateLimits.bucketKey, bucketKeyFor(scope, now)),
+  )).limit(1);
+  const used = rows[0]?.requestCount ?? 0;
+  return describeOhapiAllowance(used, limit, now);
+}
+
+export async function consumeOhapiAllowance(userId: number, scope: RateScope, limit: number, now = new Date()) {
+  const db = await requireDb();
+  const bucketKey = bucketKeyFor(scope, now);
   await db.insert(ohapiRateLimits).values({ userId, bucketKey, requestCount: 1 }).onDuplicateKeyUpdate({
     set: { requestCount: sql`${ohapiRateLimits.requestCount} + 1` },
   });
@@ -173,9 +454,24 @@ export async function consumeOhapiTextAllowance(userId: number, now = new Date()
     eq(ohapiRateLimits.userId, userId),
     eq(ohapiRateLimits.bucketKey, bucketKey),
   )).limit(1);
-  const used = rows[0]?.requestCount ?? HOURLY_TEXT_LIMIT + 1;
-  return describeOhapiTextAllowance(used, now);
+  const used = rows[0]?.requestCount ?? limit + 1;
+  return describeOhapiAllowance(used, limit, now);
 }
+
+/** Returns an unused attempt to the bucket when downstream work never ran. */
+export async function refundOhapiAllowance(userId: number, scope: RateScope, now = new Date()) {
+  const db = await requireDb();
+  await db.update(ohapiRateLimits)
+    .set({ requestCount: sql`GREATEST(${ohapiRateLimits.requestCount} - 1, 0)` })
+    .where(and(
+      eq(ohapiRateLimits.userId, userId),
+      eq(ohapiRateLimits.bucketKey, bucketKeyFor(scope, now)),
+    ));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Owner audit                                                                 */
+/* -------------------------------------------------------------------------- */
 
 export async function createOhapiAdminAudit(input: {
   userId: number;
@@ -200,12 +496,20 @@ const SAFE_AUDIT_DETAILS = new Set([
   "World mapping approved.",
   "Read-only customer-library refresh.",
   "Status read.",
+  "Companion library synchronized.",
+  "Companion visibility updated.",
+  "Companion tagline updated.",
 ]);
 
 export function sanitizeOhapiAdminAuditDetail(detail?: string) {
   const normalized = detail?.trim() ?? "";
   if (!normalized) return null;
-  if (SAFE_AUDIT_DETAILS.has(normalized) || /^Status [a-z-]+\.$/i.test(normalized) || /^provider_(400|401|403|404|422|429|500|502|503|504|network|unknown)$/.test(normalized)) return normalized;
+  if (
+    SAFE_AUDIT_DETAILS.has(normalized) ||
+    /^Status [a-z-]+\.$/i.test(normalized) ||
+    /^Synced \d+ companions? \(\d+ new, \d+ updated, \d+ retired\)\.$/.test(normalized) ||
+    /^provider_(400|401|403|404|422|429|500|502|503|504|network|unknown)$/.test(normalized)
+  ) return normalized;
   return "sanitized";
 }
 
@@ -216,16 +520,23 @@ export async function listRecentOhapiAdminAudits(limit = 25) {
 
 export async function getOhapiStudioSummary() {
   const db = await requireDb();
-  const [approved, activeRooms, openReports, sienna] = await Promise.all([
+  const [published, allCharacters, activeRooms, openReports, mediaJobs] = await Promise.all([
+    db.select({ total: sql<number>`count(*)` }).from(ohapiCharacters).where(and(
+      eq(ohapiCharacters.status, "approved"),
+      eq(ohapiCharacters.visibility, "published"),
+    )),
     db.select({ total: sql<number>`count(*)` }).from(ohapiCharacters).where(eq(ohapiCharacters.status, "approved")),
     db.select({ total: sql<number>`count(*)` }).from(ohapiRooms).where(isNull(ohapiRooms.deletedAt)),
     db.select({ total: sql<number>`count(*)` }).from(ohapiReports).where(eq(ohapiReports.status, "open")),
-    db.select({ providerCharacterId: ohapiCharacters.providerCharacterId, status: ohapiCharacters.status }).from(ohapiCharacters).where(eq(ohapiCharacters.worldSlug, "sienna-vale")).limit(1),
+    db.select({ total: sql<number>`count(*)` }).from(ohapiMediaJobs),
   ]);
   return {
-    approvedCharacters: Number(approved[0]?.total ?? 0),
+    publishedCompanions: Number(published[0]?.total ?? 0),
+    syncedCompanions: Number(allCharacters[0]?.total ?? 0),
     activeRooms: Number(activeRooms[0]?.total ?? 0),
     openReports: Number(openReports[0]?.total ?? 0),
-    sienna: sienna[0] ? { providerCharacterId: sienna[0].providerCharacterId ?? null, localStatus: sienna[0].status, readiness: "identity_review_required" as const } : null,
+    mediaJobs: Number(mediaJobs[0]?.total ?? 0),
   };
 }
+
+export type { OhapiCharacter };

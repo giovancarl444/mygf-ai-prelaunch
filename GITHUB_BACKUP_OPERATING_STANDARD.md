@@ -1,5 +1,11 @@
 # GitHub Backup Operating Standard
 
+> **Correction (verified by `git ls-remote origin`):** the working remote for this
+> repository is `https://github.com/giovancarl444/mygf-ai-prelaunch`. The
+> `limitlessaiel` reference below is retained as the original record; the backup
+> tags and recovery branches it describes were all confirmed present on the
+> `giovancarl444` remote. Owner confirmation is needed on which is authoritative.
+
 **Repository:** [limitlessaiel/mygf-ai-prelaunch](https://github.com/limitlessaiel/mygf-ai-prelaunch)  
 **Repository visibility:** Private  
 **Primary code-recovery remote:** `github-backup`
