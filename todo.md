@@ -29,4 +29,10 @@
 - [x] Prepare the six supplied portraits for managed web delivery and map each image to its fictional companion card.
 - [x] Update the discovery catalog and featured surfaces with the six real-media companion cards while preserving AI disclosure and trust boundaries.
 - [x] Verify desktop/mobile media presentation, card content, beta-interest behavior, and build health.
-- [ ] Save the companion-media implementation as a recoverable checkpoint.
+- [x] Save the companion-media implementation as a recoverable checkpoint.
+- [ ] Save and document a dedicated zero-overlay redesign baseline before changing the current companion-media experience.
+- [ ] Refactor every companion image frame to enforce the zero-overlay rule across normal, hover, and mobile states.
+- [ ] Rebuild the discovery catalog into a colorful, varied, consumer-first world-browsing composition.
+- [ ] Recompose the hero, process, beta, FAQ, and editorial sections away from a corporate product-deck feel.
+- [ ] Verify all six companion media frames, responsive rendering, beta-interest behavior, tests, production build, and runtime logs.
+- [ ] Save the zero-overlay consumer redesign as a final recovery checkpoint and record rollback references.
