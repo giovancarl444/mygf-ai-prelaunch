@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateOhApiCredential } from "./ohapi";
+import { shouldRetrySafeOhApiGet, validateOhApiCredential } from "./ohapi";
 
 function summarizeLibrary(value: unknown) {
   if (!value || typeof value !== "object") return { kind: typeof value };
@@ -32,4 +32,13 @@ describe("OhAPI credential", () => {
     expect(library).toBeDefined();
     console.info("OhAPI library summary:", JSON.stringify(summarizeLibrary(library)));
   }, 30_000);
+});
+
+describe("OhAPI safe retry policy", () => {
+  it("retries only documented transient statuses on safe GET requests", () => {
+    expect(shouldRetrySafeOhApiGet("GET", 429)).toBe(true);
+    expect(shouldRetrySafeOhApiGet("GET", 503)).toBe(true);
+    expect(shouldRetrySafeOhApiGet("GET", 400)).toBe(false);
+    expect(shouldRetrySafeOhApiGet("POST", 503)).toBe(false);
+  });
 });

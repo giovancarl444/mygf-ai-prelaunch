@@ -69,3 +69,8 @@
 - [x] Extend the owner-only companion workflow to prepare a second approved adult fictional world without publishing unreviewed provider content.
 - [x] Verify beta controls, authorization, rate limiting, reports, tests, production build, and recovery backup.
 - [x] Save and document the controlled-beta milestone with an immutable Git recovery reference.
+- [x] Inventory the active OhAPI boundary, provider state, local integration documents, and repository recovery state.
+- [x] Verify all active OhAPI implementation assumptions against current official provider documentation without creating provider content.
+- [x] Require a provider-confirmed `saved` character status and matching durable `characterId` before a newly generated companion can be mapped, and add safe GET-only transient retry coverage.
+- [x] Audit Git remotes, branch and tag protections, recovery references, ignore rules, and restore readiness.
+- [ ] Publish an authoritative integration-and-recovery operating record, then save a new recoverable checkpoint and Git backup.

@@ -3,7 +3,7 @@ import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import { OhApiError } from "./ohapi";
 import { describeOhapiTextAllowance, HOURLY_TEXT_LIMIT } from "./ohapiDb";
-import { providerFailure } from "./ohapiPilot";
+import { providerFailure, requireSavedProviderCharacterId } from "./ohapiPilot";
 
 function createAnonymousContext(): TrpcContext {
   return {
@@ -24,6 +24,7 @@ describe("OhAPI pilot authorization", () => {
     await expect(caller.ohapiPilot.admin.mapApprovedCharacter({
       worldSlug: "sienna-vale",
       displayName: "Sienna Vale",
+      characterGuid: "00000000-0000-0000-0000-000000000000",
       providerCharacterId: "provider-id",
     })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
@@ -89,5 +90,13 @@ describe("OhAPI pilot hourly text allowance", () => {
     const allowance = describeOhapiTextAllowance(HOURLY_TEXT_LIMIT + 1, boundary);
     expect(allowance).toMatchObject({ allowed: false, remaining: 0 });
     expect(allowance.resetAt.toISOString()).toBe("2026-08-14T13:00:00.000Z");
+  });
+});
+
+describe("OhAPI saved-character approval gate", () => {
+  it("requires the provider to confirm saved status and an exact durable character ID", () => {
+    expect(() => requireSavedProviderCharacterId({ status: "ready", characterId: "provider-id" }, "provider-id")).toThrow("must finish saving");
+    expect(() => requireSavedProviderCharacterId({ status: "saved", characterId: "different-id" }, "provider-id")).toThrow("must finish saving");
+    expect(requireSavedProviderCharacterId({ status: "saved", characterId: "provider-id" }, "provider-id")).toBe("provider-id");
   });
 });

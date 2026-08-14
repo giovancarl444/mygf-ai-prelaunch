@@ -1,6 +1,7 @@
 import { ENV } from "./_core/env";
 
 const OHAPI_BASE_URL = "https://api.oh.xyz";
+const SAFE_GET_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 export class OhApiError extends Error {
   constructor(
@@ -20,6 +21,10 @@ export function getOhApiKey() {
   return key;
 }
 
+export function shouldRetrySafeOhApiGet(method: string, status: number) {
+  return method === "GET" && SAFE_GET_RETRY_STATUSES.has(status);
+}
+
 export async function ohApiFetch(path: string, init: RequestInit = {}) {
   const method = init.method?.toUpperCase() ?? "GET";
   const maxAttempts = method === "GET" ? 3 : 1;
@@ -36,7 +41,9 @@ export async function ohApiFetch(path: string, init: RequestInit = {}) {
           ...init.headers,
         },
       });
-      break;
+      if (response.ok || !shouldRetrySafeOhApiGet(method, response.status) || attempt === maxAttempts) break;
+      await new Promise(resolve => setTimeout(resolve, attempt * 400));
+      continue;
     } catch (error) {
       lastNetworkError = error;
       if (attempt < maxAttempts) await new Promise(resolve => setTimeout(resolve, attempt * 400));

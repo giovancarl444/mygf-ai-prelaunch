@@ -58,6 +58,19 @@ export function providerFailure(error: unknown): never {
   throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The companion service is temporarily unavailable." });
 }
 
+export function requireSavedProviderCharacterId(
+  draft: { status?: string; characterId?: string },
+  expectedProviderCharacterId: string,
+) {
+  if (draft.status !== "saved" || typeof draft.characterId !== "string" || draft.characterId !== expectedProviderCharacterId) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "This candidate must finish saving with a matching durable provider ID before it can be approved.",
+    });
+  }
+  return draft.characterId;
+}
+
 async function ensureOwnedRoom(input: z.infer<typeof setupSchema> & { userId: number }) {
   const character = await getApprovedOhapiCharacter(input.worldSlug);
   if (!character?.providerCharacterId) {
@@ -171,7 +184,21 @@ export const ohapiPilotRouter = router({
     mapApprovedCharacter: adminProcedure.input(z.object({
       worldSlug: worldSlugSchema,
       displayName: z.string().trim().min(2).max(160),
+      characterGuid: z.string().uuid(),
       providerCharacterId: z.string().trim().min(1).max(128),
-    })).mutation(async ({ input }) => upsertApprovedOhapiCharacter(input)),
+    })).mutation(async ({ input }) => {
+      try {
+        const draft = await getOhApiCharacterDraftStatus(input.characterGuid);
+        const providerCharacterId = requireSavedProviderCharacterId(draft, input.providerCharacterId);
+        return upsertApprovedOhapiCharacter({
+          worldSlug: input.worldSlug,
+          displayName: input.displayName,
+          providerCharacterId,
+        });
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        return providerFailure(error);
+      }
+    }),
   }),
 });
