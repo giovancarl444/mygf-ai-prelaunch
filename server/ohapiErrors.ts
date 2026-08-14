@@ -40,14 +40,19 @@ export function providerFailure(error: unknown): never {
 /**
  * Whether a failed attempt should be returned to the account's allowance.
  *
- * Infrastructure failures are refunded because the customer did nothing wrong
- * and received nothing. A moderation rejection (400) is not refunded, so a
- * rejected prompt still costs an attempt and cannot be retried without bound.
+ * The line is whether the customer did anything wrong. A moderation rejection
+ * (400) or a malformed request (422) is the request itself, so it costs an
+ * attempt and cannot be retried without bound.
+ *
+ * Everything else is our side of the boundary and the customer received
+ * nothing: unreachable, upstream error, provider busy — and 401/403, which on
+ * this service covers both an invalid key and an exhausted credit balance.
+ * Charging someone for our billing state is not defensible.
  */
 export function isRefundableProviderFailure(error: unknown) {
   if (!(error instanceof OhApiError)) return false;
   if (error.status === undefined) return true; // network / unreachable
-  return error.status >= 500;
+  return error.status !== 400 && error.status !== 422;
 }
 
 /** Collapses a failure into an allowlisted audit classification. */

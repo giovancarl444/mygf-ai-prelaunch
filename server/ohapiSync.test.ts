@@ -69,9 +69,24 @@ describe("allowance refunds", () => {
     expect(isRefundableProviderFailure(new OhApiError("unreachable"))).toBe(true);
   });
 
-  it("charges a moderation rejection so retries stay bounded", () => {
+  /**
+   * The line is whether the customer did anything wrong. Only the request
+   * itself is chargeable, so a rejected prompt cannot be retried without bound.
+   */
+  it("charges a rejection of the request itself", () => {
     expect(isRefundableProviderFailure(new OhApiError("declined", 400))).toBe(false);
-    expect(isRefundableProviderFailure(new OhApiError("throttled", 429))).toBe(false);
+    expect(isRefundableProviderFailure(new OhApiError("incomplete", 422))).toBe(false);
+  });
+
+  /**
+   * On this service 403 covers both an invalid key and an exhausted credit
+   * balance, and 429 is the provider throttling us, not the customer — our
+   * own hourly allowance is what bounds them. None of it is theirs to pay for.
+   */
+  it("returns the attempt for anything on our side of the boundary", () => {
+    expect(isRefundableProviderFailure(new OhApiError("invalid key or no credit", 403))).toBe(true);
+    expect(isRefundableProviderFailure(new OhApiError("unauthorized", 401))).toBe(true);
+    expect(isRefundableProviderFailure(new OhApiError("busy", 429))).toBe(true);
   });
 
   it("ignores errors that did not come from the provider", () => {

@@ -5,10 +5,12 @@ import { adultProcedure } from "./ohapiAccess";
 import { createOhApiRoom, generateOhApiText, requestOhApiAudio, requestOhApiImage, requestOhApiVideo } from "./ohapi";
 import { type ChatMediaKind, composeMediaPrompt, detectChatMediaRequest } from "./ohapiChatIntent";
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
+import { randomUUID } from "node:crypto";
 import { PHOTO_RESOLUTION, submitMediaJob, USE_PROMPT_ENHANCEMENT } from "./ohapiMediaJobs";
 import {
   clearOwnedOhapiRoom,
   consumeOhapiAllowance,
+  createOhapiMediaJob,
   countLiveOhapiRooms,
   countOhapiRoomsCreatedThisHour,
   createOhapiMessage,
@@ -178,6 +180,23 @@ async function startRequestedMedia(input: {
     return { jobId: submitted.jobId, kind: input.kind };
   } catch (error) {
     console.error("[Chat] A requested generation could not be started:", error);
+
+    // She was asked for something and cannot send it. Saying nothing reads as
+    // the request never landing at all, so the thread carries a failed entry
+    // and lets it go. Best effort: this is already the failure path.
+    try {
+      await createOhapiMediaJob({
+        userId: input.userId,
+        ohapiCharacterId: input.ohapiCharacterId,
+        roomId: input.roomId,
+        providerJobId: `local-unstarted-${randomUUID()}`,
+        kind: input.kind,
+        prompt,
+        status: "failed",
+      });
+    } catch (recordError) {
+      console.error("[Chat] The unstarted generation could not be recorded:", recordError);
+    }
     return null;
   }
 }

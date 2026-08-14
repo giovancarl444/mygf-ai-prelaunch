@@ -423,8 +423,12 @@ export async function createOhapiMediaJob(input: {
   kind: "image" | "audio" | "video";
   prompt?: string | null;
   resultUrl?: string | null;
-  /** Audio answers with the finished file rather than a job, so it starts done. */
-  status?: "pending" | "completed";
+  /**
+   * Audio answers with the finished file rather than a job, so it starts done.
+   * A generation that never reached the provider starts failed, so the thread
+   * can say so rather than showing nothing.
+   */
+  status?: "pending" | "completed" | "failed";
 }) {
   const db = await requireDb();
   await db.insert(ohapiMediaJobs).values({

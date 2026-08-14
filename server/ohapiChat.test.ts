@@ -319,4 +319,50 @@ describe("media asked for in conversation", () => {
     expect(result.content).toBe("Hi — good to hear from you.");
     expect(result.media).toBeNull();
   });
+
+  /**
+   * Saying nothing reads as the request never landing. She was asked for a
+   * photo and could not send one, and the thread has to show that — otherwise
+   * an exhausted credit balance looks identical to her ignoring you.
+   */
+  it("records a failed entry when the generation never started", async () => {
+    const { OhApiError } = await import("./ohapi");
+    provider.requestImage.mockRejectedValueOnce(new OhApiError("no credit", 403));
+
+    await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "send me a photo" });
+
+    expect(store.createMediaJob).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 7,
+      roomId: 501,
+      kind: "image",
+      status: "failed",
+    }));
+  });
+
+  it("does the same when the generation allowance is spent", async () => {
+    state.mediaAllowanceUsed = 999;
+    await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "send me a photo" });
+
+    expect(store.createMediaJob).toHaveBeenCalledWith(expect.objectContaining({ status: "failed" }));
+  });
+
+  /**
+   * An exhausted credit balance is our billing state, not a bad request. The
+   * customer received nothing, so the attempt goes back.
+   */
+  it("returns the generation attempt when the provider refuses on credit", async () => {
+    const { OhApiError } = await import("./ohapi");
+    provider.requestImage.mockRejectedValueOnce(new OhApiError("insufficient credit", 403));
+
+    await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "send me a photo" });
+    expect(store.refund).toHaveBeenCalledWith(7, "media");
+  });
+
+  it("keeps the attempt when the provider rejects the prompt on moderation", async () => {
+    const { OhApiError } = await import("./ohapi");
+    provider.requestImage.mockRejectedValueOnce(new OhApiError("moderation", 400));
+
+    await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "send me a photo" });
+    expect(store.refund).not.toHaveBeenCalledWith(7, "media");
+  });
 });
