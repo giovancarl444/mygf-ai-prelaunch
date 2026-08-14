@@ -55,3 +55,9 @@ To return to the immediately previous compact dossier implementation, restore ch
 The first live-model milestone is preserved in project checkpoint **`8cc66895`**. It includes the server-only OhAPI boundary, migrated approved-character, room, message, and job tables, an owner-approved Sienna Vale provider mapping, explicit per-user provider-room context, and an authenticated text-first pilot interface. The owner validation created exactly one account-owned Sienna room with a selected `male` context and persisted one non-explicit prompt-response pair. No image, audio, video, or public user conversation was generated.
 
 Restore checkpoint **`dd47df6b`** to return to the secured pilot foundation before the live Sienna character, mapping, and room test. Restoring a project checkpoint changes source and managed-project state only; it **does not delete remote provider characters, provider rooms, or database records**. The live provider character and owner test room must therefore be treated as retained operational records, and no secret is included in this recovery document.
+
+## Live Pilot Error-Coverage Refresh
+
+The final live-pilot recovery state is preserved in project checkpoint **`2880a04e`**. It retains the approved Sienna Vale mapping and owner test room from `8cc66895`, and adds deterministic checks proving that provider `400`, `401/403`, `429`, and generic upstream failures are translated into product-safe messages without raw provider details or secrets. The complete deterministic test suite now reports fifteen passed tests with one intentional live-network probe skipped; the production build also passes.
+
+Restore checkpoint **`8cc66895`** to return to the live-pilot state before the additional error-mapping test coverage. As with all provider integrations, managed-project rollback does not reverse existing remote provider or database records.
