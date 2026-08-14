@@ -51,4 +51,4 @@
 - [x] Verify the corrected card geometry, catalog density, filters, mobile stacking, beta-interest behavior, tests, production build, and recovery backup.
 - [x] Replace compact colored dossiers with transparent white-text overlays inside companion portrait cards, using the supplied dense-grid reference as the structural target.
 - [x] Complete a documented, server-only OhAPI integration architecture and prerequisite review before connecting real models or generating external content.
-- [ ] Verify the transparent-overlay catalog, preserve existing beta behavior, and save a recoverable release with Git backup.
+- [x] Verify the transparent-overlay catalog, preserve existing beta behavior, and save a recoverable release with Git backup.
