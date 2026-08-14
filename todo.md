@@ -19,3 +19,8 @@
 - [x] Review the applied worlds-section edit and adapt the requested category-leading layout direction without copying the referenced site.
 - [x] Refine the worlds and supporting sections into a more commercially structured, original MyGF.ai layout while preserving the violet-neon system.
 - [x] Verify the responsive visual update and create a new recovery checkpoint.
+- [x] Unpack and inspect every screen, section, and state in the supplied reference map.
+- [x] Create a section-by-section implementation specification that maps the reference design to approved MyGF.ai content and functionality.
+- [x] Rebuild the landing page to the supplied reference map while preserving beta-interest persistence, notifications, trust boundaries, and accessibility.
+- [x] Verify desktop/mobile fidelity, beta-interest behavior, tests, and production build against the reference map.
+- [ ] Save the full reference-map implementation as a new recovery checkpoint.
