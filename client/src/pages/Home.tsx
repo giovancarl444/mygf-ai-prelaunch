@@ -129,11 +129,6 @@ export default function Home() {
       <main id="top">
         <section className="map-hero" aria-labelledby="hero-title">
           <div className="hero-copy-map"><p className="map-kicker"><span />Private access · Account-owned</p><h1 id="hero-title">Private companion worlds. <em>Your story, your memory, your control.</em></h1><p>A private adult AI companion experience for imaginative threads, distinct points of view, and memory that stays under your review.</p><div className="hero-map-actions"><a className="rose-button" href="/pilot">Start a private thread <ArrowUpRight size={17} /></a><a href="#worlds">Explore worlds <ArrowDownRight size={16} /></a></div><small><LockKeyhole size={13} />Sign in before a private thread begins.</small></div>
-          <div className="hero-catalogue" aria-label="Companion world preview">
-            <div className="catalogue-topline"><span>Tonight&apos;s directions</span><span>01—03</span></div>
-            <div className="catalogue-cards">{companionWorlds.slice(0, 3).map(world => <div className={`mini-world mini-${world.tone}`} key={world.name}><WorldMedia world={world} variant="mini" /><div className="mini-world-copy"><span>{world.category}</span><strong>{world.name.split(" ")[0]}</strong><p>{world.tag}</p></div></div>)}</div>
-            <a className="catalogue-foot" href="/pilot"><Sparkles size={15} />Open private access <ArrowUpRight size={14} /></a>
-          </div>
         </section>
 
         <section className="principle-strip" id="principles" aria-label="Product principles">

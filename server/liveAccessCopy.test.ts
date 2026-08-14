@@ -15,6 +15,11 @@ describe("live private access regression guard", () => {
     expect(home).toContain("Sign in to begin privately.");
   });
 
+  it("keeps the removed hero preview panel out of the public landing page", () => {
+    expect(home).not.toContain('className="hero-catalogue"');
+    expect(home).not.toContain('aria-label="Companion world preview"');
+  });
+
   it("shows an explicit branded account gate before initiating OAuth", () => {
     expect(pilot).toContain("useAuth()");
     expect(pilot).not.toContain("useAuth({ redirectOnUnauthenticated: true })");

@@ -94,3 +94,5 @@
 - [x] Prepare a read-only independent audit packet covering the customer journey, Sienna readiness, OhAPI boundary, and recovery posture.
 - [ ] Reconcile the returned independent audit with the verified project state and identify any material disagreements.
 - [ ] Define the approved customer-product flow and companion launch model before any further provider or public-route changes.
+- [x] Remove the obsolete landing-page access block identified by the visual edit and close the following vertical gap without changing product behavior.
+- [ ] Verify the corrected landing-page layout on desktop and mobile, then save a recovery checkpoint.
