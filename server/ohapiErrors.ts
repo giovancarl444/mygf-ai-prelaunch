@@ -15,13 +15,13 @@ export function providerFailure(error: unknown): never {
         message: "That request was declined by content moderation. Please rephrase it and try again.",
       });
     }
-    if (error.status === 401) {
-      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The companion service is not connected right now." });
-    }
-    if (error.status === 403) {
+    // The live API returns 403 for an invalid key as well as for insufficient
+    // credit, so neither status can be attributed to one cause. Verified against
+    // api.oh.xyz: a malformed key responds 403 {"message":"Invalid API key"}.
+    if (error.status === 401 || error.status === 403) {
       throw new TRPCError({
         code: "PRECONDITION_FAILED",
-        message: "This capability is not enabled on the current plan, or the account is out of credit.",
+        message: "The companion service is unavailable right now. Please try again shortly.",
       });
     }
     if (error.status === 404) {
