@@ -12,4 +12,7 @@
 - [x] Implement the exact footer disclaimer and an adult-only, pre-launch expectation boundary.
 - [x] Write and run Vitest coverage for beta-interest validation, persistence behavior, duplicate handling, and notification triggering.
 - [x] Verify desktop and mobile rendering, form behavior, accessibility, and server logs.
-- [ ] Save the completed web project checkpoint, publish it, and report the live URL plus Git backup status.
+- [x] Save the completed web project checkpoint, publish it, and report the live URL plus Git backup status.
+- [x] Verify the published release and document the canonical production URL.
+- [ ] Create and push a final immutable Git release tag and recovery branch for the published version.
+- [ ] Save a post-publication recovery checkpoint and document restoration identifiers.
