@@ -1,8 +1,19 @@
 # Deployment runbook — syncing the workspace to GitHub `main`
 
-Give this to Manus as an **operations task**. It is not a licence to edit code:
-every step is sync, check, migrate, or deploy. If something looks wrong, stop and
-report rather than fixing it.
+Give this to Manus as an **operations task**, together with the scoped
+authorization below. It is not a licence to edit code: every step is sync, check,
+migrate, or deploy. If something looks wrong, stop and report rather than fixing
+it.
+
+**Scope of the exception this task requires.** Permitted for this task only:
+reading and synchronizing workspace source from GitHub `main`, running
+`pnpm install`, `pnpm db:push`, `pnpm check`, `pnpm test`, `pnpm build`,
+deploying a build, creating the git tag named at the end, and reporting results.
+
+Still not permitted, and unchanged: editing any file under `server/`, `drizzle/`
+or `scripts/`; altering a migration; changing code to make a failing check pass;
+or **creating or modifying any secret or credential value**. Secrets are handled
+by the site owner directly, never through this task.
 
 Context: the live site builds from the Manus-hosted workspace, not from GitHub.
 That workspace currently holds the pre-rebuild application — the technical
@@ -43,7 +54,13 @@ SELECT COUNT(*) FROM ohapi_media_jobs;
 - **anything else** → stop and report the count. The migration needs adjusting
   first; do not force it.
 
-Also confirm the environment still has `DATABASE_URL` and `OHAPI_API_KEY` set.
+Then **report, without changing anything**, whether the deployed environment
+already has `DATABASE_URL` and `OHAPI_API_KEY` configured.
+
+Do not set, create, or alter either value. If `OHAPI_API_KEY` appears to be
+missing, say so and stop — the site owner will configure it. The existing
+deployment already uses this credential, so it is expected to be present even if
+it is not visible as an editable field in the workspace.
 
 ## Step 2 — Replace workspace source with GitHub `main`
 
