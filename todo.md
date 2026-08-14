@@ -59,7 +59,7 @@
 - [x] Verify persistence, authorization, provider-error behavior, tests, production build, and recovery backup for the OhAPI pilot.
 - [x] Add deterministic OhAPI provider-error mapping coverage for moderation, disabled access, throttling, and generic upstream failures.
 - [x] Verify that pilot error states remain product-safe without exposing raw provider errors or secrets, then refresh the recovery milestone.
-- [ ] Save and document the post-error-coverage OhAPI pilot recovery milestone with an immutable Git backup reference.
+- [x] Save and document the post-error-coverage OhAPI pilot recovery milestone with an immutable Git backup reference.
 - [x] Create one private Sienna Vale OhAPI draft, review the provider result, explicitly save it only after review, map its durable character ID, and validate one account-owned text room.
 - [x] Regenerate the private Sienna Vale candidate with an independent creative-professional direction, then select and save only the brand-aligned reviewed result.
 - [x] Validate the Sienna owner test room using the user-specified male provider context, while retaining explicit per-user selection and no gender inference in the product.
