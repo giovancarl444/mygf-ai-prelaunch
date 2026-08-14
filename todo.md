@@ -41,4 +41,4 @@
 - [x] Implement an original search-forward category rail, compact discovery navigation, scalable character list, and no-result state.
 - [x] Maintain zero-overlay portrait media and separate dossier metadata across every catalog result.
 - [x] Verify catalog controls, responsive layouts, zero-overlay media, beta-interest behavior, tests, production build, and runtime logs.
-- [ ] Save the catalog redesign as a recoverable checkpoint and document its rollback reference.
+- [x] Save the catalog redesign as a recoverable checkpoint and document its rollback reference.

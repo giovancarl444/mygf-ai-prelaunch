@@ -27,3 +27,7 @@ The completed zero-overlay consumer redesign is preserved in project checkpoint 
 ## Catalog-Redesign Baseline
 
 Before the scalable discovery catalog refactor, the current zero-overlay consumer experience was preserved in project checkpoint **`e8a5bc97`**. Restore checkpoint `e8a5bc97` to revert the catalog work while retaining the documented zero-overlay consumer redesign and its companion-media integration.
+
+## Scalable World-Library Catalog
+
+The completed search-forward catalog redesign is preserved in project checkpoint **`6236a159`**. It adds the original discovery rail, collection banner, world-type, adult-age, and energy filters, live result count, no-result reset, and browser-tested catalog interactions while retaining fully unobstructed portrait frames. To revert the catalog redesign, restore checkpoint **`e8a5bc97`**.
