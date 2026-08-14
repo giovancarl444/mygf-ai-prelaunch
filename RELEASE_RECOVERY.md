@@ -79,3 +79,11 @@ The corresponding immutable source references are **`backup/ohapi-contract-audit
 The production-safe Studio and isolated-playground consolidation is preserved in project checkpoint **`3142a5dd`**. It includes the reviewed `tools/oh-api-playground/` package, an owner-only `/ops/ohapi` Studio, sanitized operation auditing for candidate generation, save, and approved mapping actions, the `ohapi_admin_audits` migration, and an automated guard against importing the browser-local BYOK package into production source.
 
 The corresponding immutable source references are **`backup/ohapi-studio-consolidation-20260814`** and **`recovery/ohapi-studio-consolidation-20260814`**. Restore checkpoint **`8991ebff`** to return to the exact state before the playground source was reconciled. Restoring an application checkpoint does not delete provider characters, rooms, or other remote provider records; no new provider content was created for this milestone.
+
+## Live Access and Sienna Readiness Transition
+
+The live-access transition is preserved in project checkpoint **`627ccb6f`**. It replaces every public beta-interest and request-access call to action with private access, presents a branded account gate before OAuth begins, and removes the global unauthorized-query redirect that previously skipped that explanation. The public flow now explains that an account protects room ownership, transcript controls, reports, and per-account limits.
+
+This checkpoint also records the verified Sienna state: the provider account contains one saved character, and the local mapping points `sienna-vale` to provider ID `21555`; however, the existing provider identity is not yet aligned with the public Sienna concept. The owner Studio therefore displays an explicit **identity review required** hold. `SIENNA_READINESS_STANDARD.md` defines the required final identity, visual, and representative-thread approvals. No provider character or content was generated, saved, mapped, or published during this transition.
+
+The corresponding immutable source references are **`backup/live-access-sienna-readiness-20260814`** and **`recovery/live-access-sienna-readiness-20260814`**. Restore checkpoint **`9aea73c3`** to return to the prior Studio consolidation before the public live-access and Sienna-readiness corrections.
