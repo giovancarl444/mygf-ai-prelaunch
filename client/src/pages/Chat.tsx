@@ -568,6 +568,9 @@ export default function Chat() {
                     {jobStatus.data.kind === "image" && <img src={jobStatus.data.resultUrl} alt="Generated result" />}
                     {jobStatus.data.kind === "video" && <video controls src={jobStatus.data.resultUrl} />}
                     {jobStatus.data.kind === "audio" && <audio controls src={jobStatus.data.resultUrl} />}
+                    {jobStatus.data.followupText && (
+                      <p className="media-followup">{jobStatus.data.followupText}</p>
+                    )}
                     <div className="media-result-foot">
                       <span>Ready</span>
                       <a href={jobStatus.data.resultUrl} target="_blank" rel="noreferrer" className="companion-cta">

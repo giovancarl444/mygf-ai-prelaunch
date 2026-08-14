@@ -40,18 +40,18 @@ describe("companion slugs", () => {
  */
 describe("media job classification", () => {
   it("does not treat a presigned URL alone as completion", () => {
-    expect(classifyOhApiJob({ status: "queued", presignedUrl: "https://x.test/a.png", errorMessage: null })).toBe("pending");
-    expect(classifyOhApiJob({ status: "processing", presignedUrl: "https://x.test/a.png", errorMessage: null })).toBe("pending");
+    expect(classifyOhApiJob({ status: "queued", presignedUrl: "https://x.test/a.png", errorMessage: null, followupText: null })).toBe("pending");
+    expect(classifyOhApiJob({ status: "processing", presignedUrl: "https://x.test/a.png", errorMessage: null, followupText: null })).toBe("pending");
   });
 
   it("completes only when the status says so and a URL is present", () => {
-    expect(classifyOhApiJob({ status: "completed", presignedUrl: "https://x.test/a.png", errorMessage: null })).toBe("completed");
-    expect(classifyOhApiJob({ status: "completed", presignedUrl: null, errorMessage: null })).toBe("pending");
+    expect(classifyOhApiJob({ status: "completed", presignedUrl: "https://x.test/a.png", errorMessage: null, followupText: null })).toBe("completed");
+    expect(classifyOhApiJob({ status: "completed", presignedUrl: null, errorMessage: null, followupText: null })).toBe("pending");
   });
 
   it("treats documented and adjacent failure states as failed", () => {
     for (const status of ["failed", "error", "cancelled"]) {
-      expect(classifyOhApiJob({ status, presignedUrl: null, errorMessage: "x" })).toBe("failed");
+      expect(classifyOhApiJob({ status, presignedUrl: null, errorMessage: "x", followupText: null })).toBe("failed");
     }
   });
 

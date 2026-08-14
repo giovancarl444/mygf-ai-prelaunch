@@ -1191,6 +1191,17 @@ p {
 
 .media-scrim { display: none; }
 
+/* The line the companion writes to accompany a finished generation. */
+.media-followup {
+  margin: 0;
+  padding: 11px 12px;
+  border-top: 1px solid var(--line);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
 /* ========================================================================== */
 /* Gate / interstitial                                                        */
 /* ========================================================================== */

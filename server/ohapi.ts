@@ -266,7 +266,13 @@ export async function generateOhApiText(input: { roomId: string; characterId: st
 /* -------------------------------------------------------------------------- */
 
 export type OhApiJobSubmission = { jobId: string; presignedUrl: string | null };
-export type OhApiJobState = { status: string; presignedUrl: string | null; errorMessage: string | null };
+export type OhApiJobState = {
+  status: string;
+  presignedUrl: string | null;
+  errorMessage: string | null;
+  /** A line the companion writes to accompany a finished generation. */
+  followupText: string | null;
+};
 
 function readJobSubmission(body: unknown): OhApiJobSubmission {
   const jobId = readString(body, ["job_id", "jobId", "id"]);
@@ -308,14 +314,23 @@ export async function requestOhApiAudio(input: { characterId: string; text: stri
   return readJobSubmission(await response.json() as unknown);
 }
 
-/** GET /api/v1/jobs/{job_id}/status */
+/**
+ * GET /api/v1/jobs/{job_id}/status
+ *
+ * Answers `{ job_id, status, url, results, error }`. Note that the result link
+ * arrives as `url` here, while the submission response calls the same thing
+ * `presigned_url`; both spellings are read.
+ */
 export async function getOhApiJobStatus(jobId: string): Promise<OhApiJobState> {
   const response = await ohApiFetch(`/api/v1/jobs/${encodeURIComponent(jobId)}/status`, { method: "GET" });
   const body = await response.json() as unknown;
+  const results = asRecord(asRecord(body).results);
+
   return {
     status: (readString(body, ["status", "state", "job_status"]) ?? "unknown").toLowerCase(),
-    presignedUrl: readString(body, ["presigned_url", "presignedUrl", "url", "result_url", "output_url"]) ?? null,
+    presignedUrl: readString(body, ["url", "presigned_url", "presignedUrl", "result_url", "output_url"]) ?? null,
     errorMessage: readString(body, ["error", "error_message", "errorMessage", "failure_reason"]) ?? null,
+    followupText: readString(results, ["followup_text", "followupText", "caption", "message"]) ?? null,
   };
 }
 

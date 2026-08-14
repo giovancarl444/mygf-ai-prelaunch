@@ -452,13 +452,48 @@ export async function updateOhapiMediaJob(input: {
   status: "pending" | "completed" | "failed" | "expired";
   resultUrl?: string | null;
   errorMessage?: string | null;
+  followupText?: string | null;
 }) {
   const db = await requireDb();
   await db.update(ohapiMediaJobs).set({
     status: input.status,
     resultUrl: input.resultUrl ?? null,
     errorMessage: input.errorMessage ?? null,
+    followupText: input.followupText?.slice(0, 1_200) ?? null,
   }).where(eq(ohapiMediaJobs.id, input.id));
+}
+
+/**
+ * Generations that were still running when their status was last read.
+ *
+ * A customer who closes the tab mid-generation leaves the job pending forever,
+ * because nothing else polls it. These are reconciled when the gallery is next
+ * opened. Bounded, and old enough that a just-submitted job is left to the
+ * foreground poller.
+ */
+export async function listStaleOhapiMediaJobs(input: { userId: number; now?: Date; limit?: number }) {
+  const db = await requireDb();
+  const now = input.now ?? new Date();
+  const settleAfter = new Date(now.getTime() - 10_000);
+  const giveUpBefore = new Date(now.getTime() - MEDIA_RESULT_FRESH_MS);
+
+  return db.select().from(ohapiMediaJobs).where(and(
+    eq(ohapiMediaJobs.userId, input.userId),
+    eq(ohapiMediaJobs.status, "pending"),
+    sql`${ohapiMediaJobs.createdAt} <= ${settleAfter}`,
+    sql`${ohapiMediaJobs.createdAt} >= ${giveUpBefore}`,
+  )).orderBy(desc(ohapiMediaJobs.createdAt)).limit(input.limit ?? 5);
+}
+
+/** Marks generations abandoned once their result link would have expired. */
+export async function expireOldPendingOhapiMediaJobs(input: { userId: number; now?: Date }) {
+  const db = await requireDb();
+  const cutoff = new Date((input.now ?? new Date()).getTime() - MEDIA_RESULT_FRESH_MS);
+  await db.update(ohapiMediaJobs).set({ status: "expired" }).where(and(
+    eq(ohapiMediaJobs.userId, input.userId),
+    eq(ohapiMediaJobs.status, "pending"),
+    sql`${ohapiMediaJobs.createdAt} < ${cutoff}`,
+  ));
 }
 
 /**

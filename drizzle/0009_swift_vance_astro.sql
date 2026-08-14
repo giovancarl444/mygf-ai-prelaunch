@@ -1,0 +1,1 @@
+ALTER TABLE `ohapi_media_jobs` ADD `followupText` varchar(1200);

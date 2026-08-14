@@ -99,6 +99,9 @@ export const ohapiMediaJobs = mysqlTable("ohapi_media_jobs", {
   kind: mysqlEnum("kind", ["image", "audio", "video"]).notNull(),
   status: mysqlEnum("status", ["pending", "completed", "failed", "expired"]).default("pending").notNull(),
   prompt: varchar("prompt", { length: 1200 }),
+  // The line the companion writes to accompany a finished generation, returned
+  // on the job's `results.followup_text`.
+  followupText: varchar("followupText", { length: 1200 }),
   resultKey: varchar("resultKey", { length: 512 }),
   resultUrl: varchar("resultUrl", { length: 2048 }),
   errorMessage: text("errorMessage"),

@@ -13,10 +13,12 @@ import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import {
   consumeOhapiAllowance,
   createOhapiMediaJob,
+  expireOldPendingOhapiMediaJobs,
   getChattableOhapiCharacter,
   getOwnedOhapiMediaJob,
   HOURLY_MEDIA_LIMIT,
   listOwnedOhapiMediaJobs,
+  listStaleOhapiMediaJobs,
   refundOhapiAllowance,
   updateOhapiMediaJob,
 } from "./ohapiDb";
@@ -77,6 +79,40 @@ async function submitMediaJob<T extends { jobId: string; presignedUrl: string | 
     status: "pending" as const,
     remaining: allowance.remaining,
   };
+}
+
+/**
+ * Settles generations that finished while nobody was watching.
+ *
+ * Best effort by design: this runs on a read path, so a provider hiccup must
+ * leave the gallery working rather than fail it. Jobs too old for their result
+ * link to still resolve are marked expired instead of polled forever.
+ */
+async function reconcileStaleJobs(userId: number) {
+  try {
+    await expireOldPendingOhapiMediaJobs({ userId });
+    const stale = await listStaleOhapiMediaJobs({ userId });
+    if (!stale.length) return;
+
+    await Promise.all(stale.map(async job => {
+      try {
+        const state = await getOhApiJobStatus(job.providerJobId);
+        const status = classifyOhApiJob(state);
+        if (status === "pending") return;
+        await updateOhapiMediaJob({
+          id: job.id,
+          status,
+          resultUrl: state.presignedUrl,
+          followupText: status === "completed" ? state.followupText : null,
+          errorMessage: status === "failed" ? "generation_failed" : null,
+        });
+      } catch {
+        // Leave it pending; the next gallery read will try again.
+      }
+    }));
+  } catch (error) {
+    console.error("[Media] Stale job reconciliation failed:", error);
+  }
 }
 
 export const ohapiMediaRouter = router({
@@ -141,7 +177,14 @@ export const ohapiMediaRouter = router({
     if (!job) throw new TRPCError({ code: "NOT_FOUND", message: "That generation is no longer available." });
 
     if (job.status === "completed" || job.status === "failed") {
-      return { jobId: input.jobId, kind: job.kind, status: job.status, resultUrl: job.resultUrl, errorMessage: job.errorMessage };
+      return {
+        jobId: input.jobId,
+        kind: job.kind,
+        status: job.status,
+        resultUrl: job.resultUrl,
+        followupText: job.followupText,
+        errorMessage: job.errorMessage,
+      };
     }
 
     let state;
@@ -158,6 +201,7 @@ export const ohapiMediaRouter = router({
         id: job.id,
         status: nextStatus,
         resultUrl: state.presignedUrl,
+        followupText: nextStatus === "completed" ? state.followupText : null,
         // The provider's failure text is not surfaced to the customer.
         errorMessage: nextStatus === "failed" ? "generation_failed" : null,
       });
@@ -171,6 +215,7 @@ export const ohapiMediaRouter = router({
       // response carries a presigned URL up front, and serving that early would
       // show the customer an empty or partial asset.
       resultUrl: nextStatus === "completed" ? state.presignedUrl : null,
+      followupText: nextStatus === "completed" ? state.followupText : null,
       errorMessage: nextStatus === "failed" ? "That generation could not be completed. Please try a different prompt." : null,
     };
   }),
@@ -178,6 +223,10 @@ export const ohapiMediaRouter = router({
   gallery: adultProcedure.input(z.object({
     worldSlug: worldSlugSchema.optional(),
   })).query(async ({ ctx, input }) => {
+    // Nothing polls a generation once its tab closes, so it would stay pending
+    // forever and never reach the gallery. Settle a bounded number here.
+    await reconcileStaleJobs(ctx.user.id);
+
     const character = input.worldSlug ? await getChattableOhapiCharacter(input.worldSlug) : null;
     const jobs = await listOwnedOhapiMediaJobs({
       userId: ctx.user.id,
@@ -185,6 +234,13 @@ export const ohapiMediaRouter = router({
     });
     return jobs
       .filter(job => job.status === "completed" && job.resultUrl)
-      .map(job => ({ jobId: job.providerJobId, kind: job.kind, resultUrl: job.resultUrl, prompt: job.prompt, createdAt: job.createdAt }));
+      .map(job => ({
+        jobId: job.providerJobId,
+        kind: job.kind,
+        resultUrl: job.resultUrl,
+        prompt: job.prompt,
+        followupText: job.followupText,
+        createdAt: job.createdAt,
+      }));
   }),
 });

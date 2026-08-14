@@ -118,13 +118,37 @@ describe("verified OhAPI request contract", () => {
     });
   });
 
-  it("polls job status on the documented path", async () => {
-    respondWith({ status: "completed", presigned_url: "https://example.test/out.png" });
+  /**
+   * The live status endpoint answers `{ job_id, status, url, results, error }`.
+   * It calls the result link `url`, while the submission response calls the same
+   * thing `presigned_url`, and it carries the companion's accompanying line on
+   * `results.followup_text`.
+   */
+  it("reads the live job-status shape, including the followup line", async () => {
+    respondWith({
+      job_id: "job-1",
+      status: "completed",
+      url: "https://example.test/out.png",
+      results: { image_prompt: null, detected_level: 1, followup_text: "Thinking of you." },
+      error: null,
+    });
     const state = await getOhApiJobStatus("job-1");
 
     expect(lastRequest().url).toBe("https://api.oh.xyz/api/v1/jobs/job-1/status");
     expect(lastRequest().method).toBe("GET");
-    expect(state).toEqual({ status: "completed", presignedUrl: "https://example.test/out.png", errorMessage: null });
+    expect(state).toEqual({
+      status: "completed",
+      presignedUrl: "https://example.test/out.png",
+      errorMessage: null,
+      followupText: "Thinking of you.",
+    });
+  });
+
+  it("still reads presigned_url when the status endpoint uses that spelling", async () => {
+    respondWith({ status: "completed", presigned_url: "https://example.test/out.png" });
+    const state = await getOhApiJobStatus("job-1");
+    expect(state.presignedUrl).toBe("https://example.test/out.png");
+    expect(state.followupText).toBeNull();
   });
 });
 
