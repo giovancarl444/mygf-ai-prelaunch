@@ -3,13 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <meta name="theme-color" content="#0b0811" />
-    <meta name="description" content="MyGF.ai is a private, adult AI companion-world experience in development. Join the private beta interest list." />
-    <title>MyGF.ai — Private companion worlds</title>
+    <meta name="theme-color" content="#0a0810" />
+    <meta name="description" content="MyGF.ai is an adult AI companion experience. Pick a companion, open a private conversation, and ask for photos, voice notes, and video. 18+." />
+    <meta name="rating" content="adult" />
+    <meta property="og:title" content="MyGF.ai — Private AI companions" />
+    <meta property="og:description" content="Private conversations with AI companions, plus photos, voice, and video. Adults only." />
+    <meta property="og:type" content="website" />
+    <title>MyGF.ai — Private AI companions</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script defer src="%VITE_ANALYTICS_ENDPOINT%/umami" data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <!--
+      No analytics tag here on purpose. The previous build hard-coded an unset
+      Vite analytics-endpoint placeholder, so every page load requested the
+      un-substituted literal and returned 400 while logging a URIError server
+      side. If analytics is wanted later, inject the script from main.tsx only
+      when the endpoint variable is actually defined.
+    -->
   </body>
 </html>

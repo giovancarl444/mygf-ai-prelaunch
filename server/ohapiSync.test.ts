@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { classifyOhApiJob, isCompletedOhApiJobStatus, isFailedOhApiJobStatus, OhApiError } from "./ohapi";
 import { isRefundableProviderFailure } from "./ohapiErrors";
 import { EmptyProviderLibraryError, slugifyCompanionName, syncOhapiCharacters } from "./ohapiDb";
+import { balancedFeaturedCount } from "../client/src/pages/Home";
 
 describe("companion library sync safety", () => {
   /**
@@ -75,5 +76,22 @@ describe("allowance refunds", () => {
 
   it("ignores errors that did not come from the provider", () => {
     expect(isRefundableProviderFailure(new Error("something else"))).toBe(false);
+  });
+});
+
+/**
+ * Home renders four across on a wide screen. Five to seven featured cards would
+ * strand one on its own row, which reads as a rendering fault rather than a
+ * design choice.
+ */
+describe("featured grid balance", () => {
+  it("never leaves a single card stranded on a second row", () => {
+    expect(balancedFeaturedCount(0)).toBe(0);
+    expect(balancedFeaturedCount(3)).toBe(3);
+    expect(balancedFeaturedCount(4)).toBe(4);
+    expect(balancedFeaturedCount(5)).toBe(4);
+    expect(balancedFeaturedCount(7)).toBe(4);
+    expect(balancedFeaturedCount(8)).toBe(8);
+    expect(balancedFeaturedCount(40)).toBe(8);
   });
 });

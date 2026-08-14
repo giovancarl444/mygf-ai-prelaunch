@@ -359,6 +359,13 @@ p {
   font-size: 12px;
 }
 
+/* With no companions the second column has nothing to show, so the hero
+   centres on its copy instead of leaving a visible gap. */
+.hero-solo {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 780px;
+}
+
 .hero-collage {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -371,6 +378,22 @@ p {
 
 .hero-collage > *:nth-child(odd) {
   transform: translateY(-16px);
+}
+
+.hero-collage-tile {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(150deg, var(--surface-3), var(--surface));
+}
+
+.hero-collage-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* ========================================================================== */

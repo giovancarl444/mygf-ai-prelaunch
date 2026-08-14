@@ -34,21 +34,35 @@ const steps = [
   { title: "Ask for more", copy: "Request a photo, a voice note, or a short video right inside the conversation." },
 ];
 
+/**
+ * The featured grid is four across on a wide screen, so a count of five to
+ * seven leaves a single card stranded on its own row. Round down to a full row
+ * instead and let "See all" carry the rest.
+ */
+export function balancedFeaturedCount(total: number) {
+  if (total >= 8) return 8;
+  if (total >= 5) return 4;
+  return total;
+}
+
 export default function Home() {
   const companions = trpc.companions.list.useQuery();
-  const featured = companions.data?.slice(0, 8) ?? [];
+  const all = companions.data ?? [];
+  const featured = all.slice(0, balancedFeaturedCount(all.length));
 
   return (
     <div className="app-shell">
       <AppHeader />
 
       <main className="page">
-        <section className="hero">
+        {/* Without companions there is nothing to put in the second column, so
+            the hero collapses to one rather than reserving an empty half. */}
+        <section className={featured.length ? "hero" : "hero hero-solo"}>
           <div>
             <p className="eyebrow">Private AI companions</p>
             <h1>
-              She is ready when
-              <em>you are.</em>
+              She is ready
+              <em>when you are.</em>
             </h1>
             <p className="hero-lede">
               Pick a companion, open a private thread, and talk. Ask for photos, voice
@@ -65,17 +79,19 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="hero-collage" aria-hidden="true">
-            {companions.isLoading
-              ? Array.from({ length: 4 }, (_, index) => <CompanionCardSkeleton key={index} />)
-              : featured.slice(0, 4).map(companion => (
-                  <div key={companion.worldSlug} className="companion-portrait" style={{ borderRadius: "inherit" }}>
-                    {companion.profileImageUrl
-                      ? <img src={companion.profileImageUrl} alt="" loading="eager" />
-                      : <div className="companion-portrait-fallback"><Sparkles size={26} /></div>}
-                  </div>
-                ))}
-          </div>
+          {(companions.isLoading || featured.length > 0) && (
+            <div className="hero-collage" aria-hidden="true">
+              {companions.isLoading
+                ? Array.from({ length: 4 }, (_, index) => <CompanionCardSkeleton key={index} />)
+                : featured.slice(0, 4).map(companion => (
+                    <div key={companion.worldSlug} className="hero-collage-tile">
+                      {companion.profileImageUrl
+                        ? <img src={companion.profileImageUrl} alt="" loading="eager" />
+                        : <div className="companion-portrait-fallback"><Sparkles size={26} /></div>}
+                    </div>
+                  ))}
+            </div>
+          )}
         </section>
 
         <section id="companions">
@@ -84,8 +100,8 @@ export default function Home() {
               <h2>Available now</h2>
               <p>Everyone here is live — open a card and you are talking to her.</p>
             </div>
-            {featured.length > 0 && (
-              <Link href="/companions" className="ghost-button">See all</Link>
+            {all.length > featured.length && (
+              <Link href="/companions" className="ghost-button">See all {all.length}</Link>
             )}
           </div>
 
