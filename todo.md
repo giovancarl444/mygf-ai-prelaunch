@@ -91,3 +91,6 @@
 - [x] Save the live-access transition as a managed checkpoint and push matching immutable Git tag and recovery branch.
 - [x] Add deterministic regression coverage for the live-access language and explicit sign-in gate.
 - [x] Remove the global unauthorized-query redirect that bypasses the explicit private-account sign-in gate, and extend its regression coverage.
+- [x] Prepare a read-only independent audit packet covering the customer journey, Sienna readiness, OhAPI boundary, and recovery posture.
+- [ ] Reconcile the returned independent audit with the verified project state and identify any material disagreements.
+- [ ] Define the approved customer-product flow and companion launch model before any further provider or public-route changes.
