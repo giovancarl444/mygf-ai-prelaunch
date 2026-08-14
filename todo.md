@@ -95,4 +95,7 @@
 - [ ] Reconcile the returned independent audit with the verified project state and identify any material disagreements.
 - [ ] Define the approved customer-product flow and companion launch model before any further provider or public-route changes.
 - [x] Remove the obsolete landing-page access block identified by the visual edit and close the following vertical gap without changing product behavior.
-- [ ] Verify the corrected landing-page layout on desktop and mobile, then save a recovery checkpoint.
+- [x] Verify the corrected landing-page layout on desktop and mobile, then save a recovery checkpoint.
+- [ ] Execute the provider-verified rebuild runbook exactly and stop at the first failed or non-conforming step.
+- [ ] Commit the pending checklist state and preserve the current workspace history on `manus/workspace-preserve-20260814` before synchronization.
+- [ ] Confirm the deployment workspace and execute DEPLOY_RUNBOOK.md from Step 0 without modifying protected source or credentials.
