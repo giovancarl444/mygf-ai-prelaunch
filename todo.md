@@ -68,4 +68,4 @@
 - [x] Verify successful owner-path thread rename, private report persistence, and local transcript clear behavior using the non-personal Sienna pilot test thread.
 - [x] Extend the owner-only companion workflow to prepare a second approved adult fictional world without publishing unreviewed provider content.
 - [x] Verify beta controls, authorization, rate limiting, reports, tests, production build, and recovery backup.
-- [ ] Save and document the controlled-beta milestone with an immutable Git recovery reference.
+- [x] Save and document the controlled-beta milestone with an immutable Git recovery reference.
