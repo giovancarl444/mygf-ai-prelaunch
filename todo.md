@@ -1,6 +1,6 @@
 # Project TODO
 
-- [ ] Establish four named Git backup milestones and record their remote status.
+- [x] Establish four named Git backup milestones and record their remote status.
 - [x] Build the dark violet-neon visual system with accessible tokens, premium typography, and responsive motion.
 - [x] Implement the exact hero headline, positioning copy, navigation, and beta-interest CTA flow.
 - [x] Create six CSS-only companion world preview cards with original names, mood statements, first-line teasers, and world tags.
