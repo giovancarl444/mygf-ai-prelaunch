@@ -423,6 +423,8 @@ export async function createOhapiMediaJob(input: {
   kind: "image" | "audio" | "video";
   prompt?: string | null;
   resultUrl?: string | null;
+  /** Audio answers with the finished file rather than a job, so it starts done. */
+  status?: "pending" | "completed";
 }) {
   const db = await requireDb();
   await db.insert(ohapiMediaJobs).values({
@@ -431,7 +433,7 @@ export async function createOhapiMediaJob(input: {
     roomId: input.roomId ?? null,
     providerJobId: input.providerJobId,
     kind: input.kind,
-    status: "pending",
+    status: input.status ?? "pending",
     prompt: input.prompt?.slice(0, 1_200) ?? null,
     resultUrl: input.resultUrl ?? null,
   });

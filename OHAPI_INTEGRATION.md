@@ -171,3 +171,73 @@ the provider.
 Prompts are screened provider-side; a violation returns `400`. That is surfaced
 to the customer as a request to rephrase, with no provider text included. Adult
 generation requires verified partner access on the API key.
+
+
+## The specification, vendored
+
+`docs/ohapi-openapi.json` is the provider's own OpenAPI 3.0.3 description of
+itself — 64 operations — captured from `https://api.oh.xyz/openapi.json`.
+`docs/OHAPI_REFERENCE.md` is generated from it. Refresh both, and see what moved,
+with:
+
+```
+node scripts/ohapi-docs.mjs           # refresh and report route changes
+node scripts/ohapi-docs.mjs --check   # fail if the vendored copy is stale
+```
+
+Read that instead of the documentation page. The page renders its request tables
+client-side from this same spec, so fetching the page as text returns a partial
+document — which is how "the image endpoint accepts no quality parameters" got
+written down as fact when it accepts three.
+
+### What the specification confirms
+
+- `GET /api/v1/characters` does not exist. It is absent from all 64 operations.
+  `customer-library` is the listing, as observed.
+- `/api/v1/audio/notes` is the real audio path. The prose page's `/api/v1/audio`
+  appears nowhere in the spec.
+- **Audio is synchronous.** It answers `200 { url }` — no `job_id`. Images and
+  videos answer `202` with one, which is why the reference badges those two
+  "Async" and audio nothing. We were requiring a job id on every media
+  submission, so a successful voice note was read as a malformed response and
+  rejected. `requestOhApiAudio` now accepts either shape, and a synchronous
+  result is recorded as an already-complete job under a local `local-audio-…`
+  identifier so the gallery, the transcript, and the ownership checks keep one
+  shape to handle.
+
+### Where we still diverge, deliberately
+
+| We send | Spec says | Why |
+| --- | --- | --- |
+| `POST /images` with `room_id` | not listed | Observed to work, and it is what returns `followup_text`. |
+| `POST /text` with `character_id` and `message` | `room_id` + `prompt` | Observed to work. Not changed — see the standing rule. |
+| `POST /rooms` with `user_id` | `user_gender` required | Observed: the service asks for "user_id (or legacy user_gender)". |
+| `POST /audio/notes` with `text` | `prompt` | Both are now sent; the service ignores fields it does not know. |
+
+The rule stands: this table is a record of what to re-test when a key is
+available again, not a list of things to "fix" toward the documentation.
+
+### Available and not yet used
+
+Recorded so these are decisions rather than oversights:
+
+- **`texting_style`** on room creation — `default` | `short-form` | `long-form`,
+  plus `PATCH /api/v1/rooms/{room_id}/texting-style`. `ohapi_rooms.textingStyle`
+  already stores exactly these three values and is never sent to the provider.
+- **Video controls** — `length` (5/10/15), `resolution`, and for image-to-video a
+  `category` enum of motion types. We send none of them.
+- **`GET /api/v1/videos/get`** — a separate status path for image-to-video.
+- **Character generation** — `POST /api/v1/characters/generate` and `/save`, a v2
+  pair, and roughly thirty attribute vocabularies (`/characters/kinks`,
+  `/ethnicities`, `/personalities`, and so on) that would let companions be
+  authored rather than only synced.
+- **Cam sessions** — `POST /api/v1/cam/create`, `GET /cam/sessions`,
+  `DELETE /cam/sessions/{sessionId}`.
+- **Digital twins** — create, update, and status endpoints.
+
+### One thing to confirm with the provider
+
+Explicit generation "is restricted to verified adult platform partners and
+requires a validated API key with adult content permissions enabled." Whether
+our key carries that permission is not visible from the API, and it decides
+whether a large part of this product works. Worth asking them directly.

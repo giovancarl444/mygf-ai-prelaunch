@@ -17,9 +17,12 @@ against the live service:
 - Characters return `characterId` (a number), `firstName`, `lastName`, `sfwImage`.
 - `POST /api/v1/rooms` requires `user_id`, and `character_id` must be a string.
 - Portrait URLs expire after 1 hour; generated media lasts 7 days.
-- The docs render request tables client-side. A plain text fetch returns a
-  partial page — read the rendered page, or you will conclude fields do not
-  exist when they do. That mistake has already been made once.
+- Audio is synchronous — `200 { url }`, no `job_id`. Images and videos are not.
+- **Read `docs/OHAPI_REFERENCE.md`, not the documentation page.** The page
+  renders its tables client-side from `/openapi.json`, so fetching it as text
+  returns a partial document and invites exactly the wrong conclusion. The spec
+  is vendored at `docs/ohapi-openapi.json`; refresh with
+  `node scripts/ohapi-docs.mjs`.
 
 `server/ohapi.ts` matches the live service, and `server/ohapiContract.test.ts`
 locks it. `OHAPI_INTEGRATION.md` records every divergence. **Do not "correct"

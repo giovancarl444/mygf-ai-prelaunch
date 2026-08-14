@@ -133,7 +133,10 @@ export type OhApiCharacter = {
 export function normalizeOhApiCharacter(raw: unknown, type: OhApiCharacter["type"] = null): OhApiCharacter | null {
   // The service returns a numeric id but requires a string on every request
   // that consumes one, so it is normalized to a string here, once.
-  const characterId = readString(raw, ["characterId", "character_id", "id"]);
+  // `cid` and `profilePhotoUrl` are the spellings the provider's own OpenAPI
+  // example uses; the live service currently answers with `characterId` and
+  // `sfwImage`. Both are read so a correction upstream is not an outage here.
+  const characterId = readString(raw, ["characterId", "character_id", "cid", "id"]);
   if (!characterId) return null;
 
   const source = asRecord(raw);
@@ -152,7 +155,7 @@ export function normalizeOhApiCharacter(raw: unknown, type: OhApiCharacter["type
     age: Number.isFinite(parsedAge) ? parsedAge : null,
     occupation: readString(raw, ["occupation", "job", "profession"]) ?? null,
     // Presigned and short lived — see listOhApiCharacters.
-    profileImageUrl: readString(raw, ["sfwImage", "sfw_image", "profile_image_url", "profileImageUrl", "image_url", "imageUrl", "image"]) ?? null,
+    profileImageUrl: readString(raw, ["sfwImage", "sfw_image", "profile_image_url", "profileImageUrl", "profilePhotoUrl", "image_url", "imageUrl", "image"]) ?? null,
     type: rawType === "ORIGINAL" || rawType === "DIGITAL_TWIN" ? rawType : type,
   };
 }
@@ -373,15 +376,35 @@ export async function requestOhApiVideo(input: {
 /**
  * POST /api/v1/audio/notes
  *
- * The documented `/api/v1/audio` does not exist — it answers 403 "Unknown
- * endpoint". Like images, this accepts `room_id` or `character_id`.
+ * The prose documentation's `/api/v1/audio` does not exist — it answers 403
+ * "Unknown endpoint". This path does.
+ *
+ * **Audio is synchronous.** Unlike images and videos it answers 200 with the
+ * finished `url` rather than 202 with a `job_id`, which is why the reference
+ * marks images and videos "Async" and this one nothing. Both shapes are
+ * accepted here: a job id is treated as a job, a bare url as already done.
+ *
+ * The specification names the text field `prompt` and requires `room_id`; the
+ * field we have been sending is `text`. Both are sent, because this service
+ * ignores fields it does not recognise and there is no key available to
+ * determine which one it reads.
  */
 export async function requestOhApiAudio(input: { characterId: string; roomId?: string; text: string }) {
-  const body: Record<string, unknown> = { character_id: String(input.characterId), text: input.text };
+  const body: Record<string, unknown> = {
+    character_id: String(input.characterId),
+    text: input.text,
+    prompt: input.text,
+  };
   if (input.roomId) body.room_id = input.roomId;
 
   const response = await ohApiFetch("/api/v1/audio/notes", { method: "POST", body: JSON.stringify(body) });
-  return readJobSubmission(await response.json() as unknown);
+  const payload = await response.json() as unknown;
+
+  const jobId = readString(payload, ["job_id", "jobId", "id"]) ?? null;
+  const url = readString(payload, ["url", "presigned_url", "presignedUrl", "audio_url"]) ?? null;
+  if (!jobId && !url) throw new OhApiError("OhAPI returned neither a job nor an audio URL.");
+
+  return { jobId, presignedUrl: url };
 }
 
 /**

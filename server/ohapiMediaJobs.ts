@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { randomUUID } from "node:crypto";
 import { classifyOhApiJob, getOhApiJobStatus, type OhApiResolution } from "./ohapi";
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import {
@@ -35,7 +36,7 @@ export const PHOTO_RESOLUTION: OhApiResolution = "9:16";
  * Shared by the generation panel and by conversation, so that a photo asked for
  * in chat is charged, owned, and bounded exactly like one asked for directly.
  */
-export async function submitMediaJob<T extends { jobId: string; presignedUrl: string | null }>(input: {
+export async function submitMediaJob<T extends { jobId: string | null; presignedUrl: string | null }>(input: {
   userId: number;
   kind: "image" | "video" | "audio";
   prompt: string;
@@ -57,6 +58,31 @@ export async function submitMediaJob<T extends { jobId: string; presignedUrl: st
   } catch (error) {
     if (isRefundableProviderFailure(error)) await refundOhapiAllowance(input.userId, "media");
     return providerFailure(error);
+  }
+
+  // Audio is synchronous: it answers with the finished file and no job id, so
+  // there is nothing to poll. It is recorded as already complete under a local
+  // identifier, which keeps one shape — a media job — for everything the
+  // gallery, the transcript, and the ownership checks have to handle.
+  if (!submission.jobId) {
+    if (!submission.presignedUrl) return providerFailure(new Error("The provider returned no result."));
+    const localJobId = `local-${input.kind}-${randomUUID()}`;
+    await createOhapiMediaJob({
+      userId: input.userId,
+      ohapiCharacterId: input.ohapiCharacterId ?? null,
+      roomId: input.roomId ?? null,
+      providerJobId: localJobId,
+      kind: input.kind,
+      prompt: input.prompt,
+      resultUrl: submission.presignedUrl,
+      status: "completed",
+    });
+    return {
+      jobId: localJobId,
+      kind: input.kind,
+      status: "completed" as const,
+      remaining: allowance.remaining,
+    };
   }
 
   // The submission's presigned URL points at an object that does not exist yet,

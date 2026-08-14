@@ -176,15 +176,45 @@ describe("verified OhAPI request contract", () => {
   });
 
   /**
-   * The documented `/api/v1/audio` does not exist — it answers 403 "Unknown
-   * endpoint". `/api/v1/audio/notes` is the real path.
+   * The prose documentation's `/api/v1/audio` does not exist — it answers 403
+   * "Unknown endpoint". `/api/v1/audio/notes` is the real path, and it is also
+   * the path the OpenAPI specification gives.
+   *
+   * The specification names the spoken text `prompt`; we have been sending
+   * `text`. Both go, because there is no key available to determine which one
+   * the service reads and it ignores fields it does not recognise.
    */
-  it("requests audio on the notes path, not the documented one", async () => {
+  it("requests audio on the notes path, under both spellings of the text", async () => {
     respondWith({ job_id: "job-2" });
     await requestOhApiAudio({ characterId: "char-1", text: "say this" });
 
     expect(lastRequest().url).toBe("https://api.oh.xyz/api/v1/audio/notes");
-    expect(lastRequest().body).toEqual({ character_id: "char-1", text: "say this" });
+    expect(lastRequest().body).toEqual({ character_id: "char-1", text: "say this", prompt: "say this" });
+  });
+
+  /**
+   * Audio is synchronous. It answers 200 with the finished file rather than
+   * 202 with a job id, which is why the reference marks images and videos
+   * "Async" and this one nothing. Demanding a job id here rejected every
+   * successful voice note.
+   */
+  it("accepts a finished audio URL with no job id", async () => {
+    respondWith({ url: "https://example.test/note.mp3" });
+    const result = await requestOhApiAudio({ characterId: "char-1", roomId: "room-9", text: "say this" });
+
+    expect(result.jobId).toBeNull();
+    expect(result.presignedUrl).toBe("https://example.test/note.mp3");
+  });
+
+  it("still accepts a job id if the provider ever makes audio asynchronous", async () => {
+    respondWith({ job_id: "job-async" });
+    const result = await requestOhApiAudio({ characterId: "char-1", text: "say this" });
+    expect(result.jobId).toBe("job-async");
+  });
+
+  it("refuses a response carrying neither a job nor a file", async () => {
+    respondWith({ message: "ok" });
+    await expect(requestOhApiAudio({ characterId: "char-1", text: "say this" })).rejects.toThrow(/neither a job nor an audio URL/);
   });
 
   it("uses the in-room flow for image and audio when a room exists", async () => {
@@ -194,7 +224,12 @@ describe("verified OhAPI request contract", () => {
 
     respondWith({ job_id: "job-6" });
     await requestOhApiAudio({ characterId: "char-1", roomId: "room-9", text: "say this" });
-    expect(lastRequest().body).toEqual({ character_id: "char-1", room_id: "room-9", text: "say this" });
+    expect(lastRequest().body).toEqual({
+      character_id: "char-1",
+      room_id: "room-9",
+      text: "say this",
+      prompt: "say this",
+    });
   });
 
   it("supports both documented video modes without mixing their fields", async () => {
