@@ -15,7 +15,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { FormEvent, Fragment, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { filterCatalogWorlds, type AgeFilter, type EnergyFilter, type WorldCategory } from "@/lib/catalogFilters";
 
@@ -70,7 +70,7 @@ function WorldMedia({ world, variant = "catalog" }: { world: CompanionWorld; var
 
   return (
     <div className={`${frameClass}${hasPortrait ? "" : ` abstract-world-art art-${world.art ?? "lilac"}`}`} role={hasPortrait ? undefined : "img"} aria-label={hasPortrait ? undefined : `CSS-only abstract world art for fictional adult AI companion ${world.name}`}>
-      {hasPortrait ? <img src={world.image} alt={`Portrait assigned to fictional adult AI companion ${world.name}`} loading={variant === "catalog" ? "lazy" : undefined} style={{ objectPosition: world.focus }} /> : <span className="abstract-art-core" aria-hidden="true" />}
+      {hasPortrait ? <img src={world.image} alt={`Portrait assigned to fictional adult AI companion ${world.name}`} loading={variant === "catalog" ? "eager" : undefined} style={{ objectPosition: world.focus }} /> : <span className="abstract-art-core" aria-hidden="true" />}
     </div>
   );
 }
@@ -194,7 +194,7 @@ export default function Home() {
               </div>
               <div className="catalog-category-row" aria-label="Quick world filters">{categories.map(category => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category === "All" ? "All worlds" : category}</button>)}<span className="world-count"><SlidersHorizontal size={15} />{visibleWorlds.length} of {companionWorlds.length} worlds</span></div>
               <div className="world-grid-map">
-                {visibleWorlds.map((world, index) => <Fragment key={world.name}><article className={`companion-card tone-${world.tone}`}><WorldMedia world={world} /><div className="companion-dossier"><div className="dossier-topline"><span>{world.category} world</span><span>{world.age} · adult</span></div><h3>{world.name}</h3><p className="world-tagline">{world.tag}</p><p className="world-mood">{world.mood}</p>{world.art && <span className="abstract-world-note">CSS-only world preview</span>}<blockquote>“{world.line}”</blockquote><div className="dossier-action"><span><MoonStar size={13} />Fictional AI</span><button type="button" onClick={scrollToBeta}>Request beta <ArrowUpRight size={14} /></button></div></div></article>{index === 7 && visibleWorlds.length > 8 && <aside className="thread-note-card"><p className="map-kicker"><span />Thread note</p><h3>New worlds are designed to join the same library.</h3><p>Every entry remains a clearly adult fictional AI world, with memory and privacy controls kept separate from the story itself.</p><button type="button" onClick={scrollToBeta}>Request beta access <ArrowUpRight size={14} /></button></aside>}</Fragment>)}
+                {visibleWorlds.map(world => <button className={`companion-card tone-${world.tone}`} type="button" key={world.name} onClick={scrollToBeta} aria-label={`Request private beta access for ${world.name}, a fictional adult AI companion world`}><WorldMedia world={world} /><span className="companion-dossier"><span className="dossier-topline"><span>{world.category} world</span><span>{world.age} · adult</span></span><strong>{world.name}</strong><span className="world-tagline">{world.tag}</span>{world.art && <span className="abstract-world-note">CSS-only preview</span>}</span></button>)}
               </div>
               {visibleWorlds.length === 0 && <div className="no-worlds"><MoonStar size={22} /><p>No world matches that combination yet.</p><button type="button" onClick={clearWorldFilters}>Clear all filters</button></div>}
             </div>

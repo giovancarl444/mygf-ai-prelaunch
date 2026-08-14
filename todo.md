@@ -47,3 +47,5 @@
 - [x] Implement the refined MyGF.ai consumer catalog with persistent navigation, dense browsing, and compact discovery controls without copying Candy.ai branding or expression.
 - [x] Verify visual originality, zero-overlay media, discovery interactions, responsive layouts, beta-interest behavior, tests, production build, and runtime logs.
 - [x] Save the refined catalog as a recoverable checkpoint and document its rollback reference.
+- [x] Rebuild companion cards into a compact fixed-height portrait grid that follows the supplied dense browsing reference while keeping all portrait media entirely unobstructed.
+- [x] Verify the corrected card geometry, catalog density, filters, mobile stacking, beta-interest behavior, tests, production build, and recovery backup.
