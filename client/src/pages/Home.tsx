@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { filterCatalogWorlds, type AgeFilter, type EnergyFilter, type WorldCategory } from "@/lib/catalogFilters";
 
 type InterestChoice =
   | "story/character continuity"
@@ -24,17 +25,17 @@ type InterestChoice =
   | "imaginative roleplay"
   | "curious about AI";
 
-type WorldCategory = "All" | "Reflective" | "Story" | "Imaginative" | "Curious";
-
 const categories: WorldCategory[] = ["All", "Reflective", "Story", "Imaginative", "Curious"];
+const ageFilters: AgeFilter[] = ["Any age", "21–24", "25–29", "30+"];
+const energyFilters: EnergyFilter[] = ["All energy", "Bright", "Grounded", "Composed", "Adventurous"];
 
 const companionWorlds = [
-  { name: "Sienna Vale", age: 24, category: "Curious", mood: "Bright, observant, and lightly playful", line: "You have that look like a story started before you got here.", tag: "Soft Signal", tone: "sienna", image: "/manus-storage/sienna-vale_170c60d5.jpg", focus: "center 19%" },
-  { name: "Camille Rowan", age: 32, category: "Reflective", mood: "Composed, candid, and quietly funny", line: "We can make the evening simpler, if you want.", tag: "Sunday Edit", tone: "camille", image: "/manus-storage/camille-rowan_605f1e19.jpg", focus: "center 19%" },
-  { name: "Marisol Hart", age: 29, category: "Reflective", mood: "Measured, warm, and precise", line: "Start with the part you usually leave out.", tag: "Night Window", tone: "marisol", image: "/manus-storage/marisol-hart_ed05d41e.jpg", focus: "center 22%" },
-  { name: "Lena Morris", age: 23, category: "Curious", mood: "Open-hearted, curious, and energetic", line: "I have a feeling the interesting part is just ahead.", tag: "Open Door", tone: "lena", image: "/manus-storage/lena-morris_7cf4e27c.jpg", focus: "center 20%" },
-  { name: "Ari Vega", age: 27, category: "Imaginative", mood: "Imaginative, grounded, and scene-driven", line: "Give me the first detail, and I will meet you there.", tag: "Green Room", tone: "ari", image: "/manus-storage/ari-vega_45f1915c.jpg", focus: "center 18%" },
-  { name: "Noor Ellis", age: 26, category: "Story", mood: "Calm, adventurous, and self-possessed", line: "No need to decide the whole direction yet.", tag: "Still Water", tone: "noor", image: "/manus-storage/noor-ellis_c1048cbe.jpg", focus: "center 23%" },
+  { name: "Sienna Vale", age: 24, category: "Curious", energy: "Bright", mood: "Bright, observant, and lightly playful", line: "You have that look like a story started before you got here.", tag: "Soft Signal", tone: "sienna", image: "/manus-storage/sienna-vale_170c60d5.jpg", focus: "center 19%" },
+  { name: "Camille Rowan", age: 32, category: "Reflective", energy: "Composed", mood: "Composed, candid, and quietly funny", line: "We can make the evening simpler, if you want.", tag: "Sunday Edit", tone: "camille", image: "/manus-storage/camille-rowan_605f1e19.jpg", focus: "center 19%" },
+  { name: "Marisol Hart", age: 29, category: "Reflective", energy: "Grounded", mood: "Measured, warm, and precise", line: "Start with the part you usually leave out.", tag: "Night Window", tone: "marisol", image: "/manus-storage/marisol-hart_ed05d41e.jpg", focus: "center 22%" },
+  { name: "Lena Morris", age: 23, category: "Curious", energy: "Bright", mood: "Open-hearted, curious, and energetic", line: "I have a feeling the interesting part is just ahead.", tag: "Open Door", tone: "lena", image: "/manus-storage/lena-morris_7cf4e27c.jpg", focus: "center 20%" },
+  { name: "Ari Vega", age: 27, category: "Imaginative", energy: "Grounded", mood: "Imaginative, grounded, and scene-driven", line: "Give me the first detail, and I will meet you there.", tag: "Green Room", tone: "ari", image: "/manus-storage/ari-vega_45f1915c.jpg", focus: "center 18%" },
+  { name: "Noor Ellis", age: 26, category: "Story", energy: "Adventurous", mood: "Calm, adventurous, and self-possessed", line: "No need to decide the whole direction yet.", tag: "Still Water", tone: "noor", image: "/manus-storage/noor-ellis_c1048cbe.jpg", focus: "center 23%" },
 ] as const;
 
 const principles = [
@@ -61,6 +62,8 @@ export default function Home() {
   const [interest, setInterest] = useState<InterestChoice | "">("");
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<WorldCategory>("All");
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>("Any age");
+  const [energyFilter, setEnergyFilter] = useState<EnergyFilter>("All energy");
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -68,13 +71,20 @@ export default function Home() {
   }, []);
 
   const visibleWorlds = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    return companionWorlds.filter(world => {
-      const categoryMatches = activeCategory === "All" || world.category === activeCategory;
-      const queryMatches = !query || [world.name, world.mood, world.tag, world.category].join(" ").toLowerCase().includes(query);
-      return categoryMatches && queryMatches;
+    return filterCatalogWorlds(companionWorlds, {
+      category: activeCategory,
+      age: ageFilter,
+      energy: energyFilter,
+      query: searchTerm,
     });
-  }, [activeCategory, searchTerm]);
+  }, [activeCategory, ageFilter, energyFilter, searchTerm]);
+
+  const clearWorldFilters = () => {
+    setActiveCategory("All");
+    setAgeFilter("Any age");
+    setEnergyFilter("All energy");
+    setSearchTerm("");
+  };
 
   const submitInterest = trpc.betaInterest.submit.useMutation({
     onSuccess: result => {
@@ -128,12 +138,30 @@ export default function Home() {
         </section>
 
         <section className="world-library" id="worlds" aria-labelledby="worlds-title">
-          <div className="library-heading"><div><p className="map-kicker"><span />Companion worlds</p><h2 id="worlds-title">Explore a direction.<br /><em>Keep the thread.</em></h2></div><p>Each world begins with a point of view, a first line, and a setting that can grow with your choices.</p></div>
-          <div className="library-controls"><div className="search-wrap"><Search size={17} /><input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search worlds" aria-label="Search companion worlds" /></div><div className="category-list" aria-label="Filter companion worlds">{categories.map(category => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category}</button>)}</div><span className="world-count"><SlidersHorizontal size={15} />{visibleWorlds.length} directions</span></div>
-          <div className="world-grid-map">
-            {visibleWorlds.map((world, index) => <article className={`companion-card tone-${world.tone} card-layout-${index % 6}`} key={world.name}><div className="zero-overlay-portrait-frame"><img src={world.image} alt={`Portrait assigned to fictional adult AI companion ${world.name}`} loading="lazy" style={{ objectPosition: world.focus }} /></div><div className="companion-dossier"><div className="dossier-topline"><span>{world.category} world</span><span>{world.age} · adult</span></div><h3>{world.name}</h3><p className="world-tagline">{world.tag}</p><p className="world-mood">{world.mood}</p><blockquote>“{world.line}”</blockquote><div className="dossier-action"><span><MoonStar size={13} />Fictional AI</span><button type="button" onClick={scrollToBeta}>Enter world <ArrowUpRight size={14} /></button></div></div></article>)}
+          <div className="catalog-shell">
+            <aside className="catalog-rail" aria-label="World library navigation">
+              <div className="catalog-rail-brand"><Sparkles size={16} /><span>World library</span></div>
+              <a className="catalog-rail-link active" href="#worlds"><span>01</span>Discover worlds</a>
+              <a className="catalog-rail-link" href="#how-it-works"><span>02</span>How threads work</a>
+              <a className="catalog-rail-link" href="#principles"><span>03</span>Your controls</a>
+              <div className="catalog-rail-note"><span>Private beta</span><strong>{companionWorlds.length} fictional adult worlds</strong><p>New worlds can join this library without changing how you browse.</p></div>
+            </aside>
+            <div className="catalog-content">
+              <div className="library-heading"><div><p className="map-kicker"><span />Companion worlds</p><h2 id="worlds-title">Find a direction.<br /><em>Follow the thread.</em></h2></div><p>Each world begins with a point of view, a first line, and a setting that can grow with your choices.</p></div>
+              <div className="catalog-banner"><div><span>Tonight&apos;s directions</span><h3>A living library<br />of fictional worlds.</h3><p>A new branded collection image can replace this color story whenever it is ready.</p></div><div className="catalog-banner-orbits" aria-hidden="true"><i /><i /><i /></div><button type="button" onClick={scrollToBeta}>Explore your match <ArrowUpRight size={15} /></button></div>
+              <div className="catalog-commandbar" aria-label="Search and filter companion worlds">
+                <div className="search-wrap"><Search size={17} /><input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search names, worlds, or energy" aria-label="Search companion worlds" /></div>
+                <div className="filter-select"><label htmlFor="world-type">World</label><select id="world-type" value={activeCategory} onChange={event => setActiveCategory(event.target.value as WorldCategory)}>{categories.map(category => <option key={category} value={category}>{category === "All" ? "All worlds" : category}</option>)}</select><ChevronDown size={15} /></div>
+                <div className="filter-select"><label htmlFor="age-range">Age</label><select id="age-range" value={ageFilter} onChange={event => setAgeFilter(event.target.value as AgeFilter)}>{ageFilters.map(age => <option key={age} value={age}>{age}</option>)}</select><ChevronDown size={15} /></div>
+                <div className="filter-select"><label htmlFor="energy-filter">Energy</label><select id="energy-filter" value={energyFilter} onChange={event => setEnergyFilter(event.target.value as EnergyFilter)}>{energyFilters.map(energy => <option key={energy} value={energy}>{energy}</option>)}</select><ChevronDown size={15} /></div>
+              </div>
+              <div className="catalog-category-row" aria-label="Quick world filters">{categories.map(category => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category === "All" ? "All worlds" : category}</button>)}<span className="world-count"><SlidersHorizontal size={15} />{visibleWorlds.length} of {companionWorlds.length} worlds</span></div>
+              <div className="world-grid-map">
+                {visibleWorlds.map((world, index) => <article className={`companion-card tone-${world.tone} card-layout-${index % 6}`} key={world.name}><div className="zero-overlay-portrait-frame"><img src={world.image} alt={`Portrait assigned to fictional adult AI companion ${world.name}`} loading="lazy" style={{ objectPosition: world.focus }} /></div><div className="companion-dossier"><div className="dossier-topline"><span>{world.category} world</span><span>{world.age} · adult</span></div><h3>{world.name}</h3><p className="world-tagline">{world.tag}</p><p className="world-mood">{world.mood}</p><blockquote>“{world.line}”</blockquote><div className="dossier-action"><span><MoonStar size={13} />Fictional AI</span><button type="button" onClick={scrollToBeta}>Enter world <ArrowUpRight size={14} /></button></div></div></article>)}
+              </div>
+              {visibleWorlds.length === 0 && <div className="no-worlds"><MoonStar size={22} /><p>No world matches that combination yet.</p><button type="button" onClick={clearWorldFilters}>Clear all filters</button></div>}
+            </div>
           </div>
-          {visibleWorlds.length === 0 && <div className="no-worlds"><MoonStar size={22} /><p>No world matches that direction yet.</p><button type="button" onClick={() => { setActiveCategory("All"); setSearchTerm(""); }}>Show all worlds</button></div>}
         </section>
 
         <section className="how-map" id="how-it-works" aria-labelledby="how-title"><div><p className="map-kicker"><span />A deliberate way in</p><h2 id="how-title">Start with a world.<br /><em>Shape what follows.</em></h2></div><div className="how-steps-map"><article><span>01</span><h3>Choose a world</h3><p>Begin with a voice, setting, and first line that feels right for the moment.</p></article><article><span>02</span><h3>Build your thread</h3><p>Let the conversation develop in its own rhythm through a considered character world.</p></article><article><span>03</span><h3>Your memory, your rules</h3><p>Review the details that may carry forward, then keep, edit, or remove them on your terms.</p></article></div></section>

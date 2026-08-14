@@ -36,9 +36,9 @@
 - [x] Recompose the hero, process, beta, FAQ, and editorial sections away from a corporate product-deck feel.
 - [x] Verify all six companion media frames, responsive rendering, beta-interest behavior, tests, production build, and runtime logs.
 - [x] Save the zero-overlay consumer redesign as a final recovery checkpoint and record rollback references.
-- [ ] Save and document a dedicated catalog-redesign baseline before changing the current discovery section.
-- [ ] Define an original long-list catalog structure, category taxonomy, and filter behavior based on the supplied research screenshots.
-- [ ] Implement an original search-forward category rail, compact discovery navigation, scalable character list, and no-result state.
-- [ ] Maintain zero-overlay portrait media and separate dossier metadata across every catalog result.
-- [ ] Verify catalog controls, responsive layouts, zero-overlay media, beta-interest behavior, tests, production build, and runtime logs.
+- [x] Save and document a dedicated catalog-redesign baseline before changing the current discovery section.
+- [x] Define an original long-list catalog structure, category taxonomy, and filter behavior based on the supplied research screenshots.
+- [x] Implement an original search-forward category rail, compact discovery navigation, scalable character list, and no-result state.
+- [x] Maintain zero-overlay portrait media and separate dossier metadata across every catalog result.
+- [x] Verify catalog controls, responsive layouts, zero-overlay media, beta-interest behavior, tests, production build, and runtime logs.
 - [ ] Save the catalog redesign as a recoverable checkpoint and document its rollback reference.

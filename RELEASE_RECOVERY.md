@@ -23,3 +23,7 @@ Before the consumer-first zero-overlay redesign, the existing six-companion medi
 ## Final Zero-Overlay Consumer Redesign
 
 The completed zero-overlay consumer redesign is preserved in project checkpoint **`5c1bae97`**. It presents all six companion portraits as unobstructed image-only frames, moves profile metadata and calls to action into separate colorful dossiers, and retains the beta-interest flow and product boundaries. To undo this redesign while keeping the earlier portrait integration, restore checkpoint **`d02a6b36`**. To return to the original pre-media implementation, restore checkpoint **`b59f336e`**.
+
+## Catalog-Redesign Baseline
+
+Before the scalable discovery catalog refactor, the current zero-overlay consumer experience was preserved in project checkpoint **`e8a5bc97`**. Restore checkpoint `e8a5bc97` to revert the catalog work while retaining the documented zero-overlay consumer redesign and its companion-media integration.
