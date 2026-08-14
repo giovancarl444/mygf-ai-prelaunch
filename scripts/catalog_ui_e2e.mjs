@@ -16,6 +16,7 @@ try {
   assertEqual(await countCards(), 18, "Initial catalog count");
   assertEqual(await page.locator(".abstract-world-art").count(), 12, "CSS-only abstract preview count");
   assertEqual(await page.locator(".zero-overlay-portrait-frame .companion-dossier").count(), 0, "No dossier text inside portrait frames");
+  assertEqual(await page.locator(".companion-card .companion-overlay").count(), 18, "Transparent text-overlay count");
 
   await page.locator("#world-type").selectOption("Reflective");
   assertEqual(await countCards(), 5, "Reflective category count");

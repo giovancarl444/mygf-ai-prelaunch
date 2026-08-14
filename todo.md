@@ -49,3 +49,6 @@
 - [x] Save the refined catalog as a recoverable checkpoint and document its rollback reference.
 - [x] Rebuild companion cards into a compact fixed-height portrait grid that follows the supplied dense browsing reference while keeping all portrait media entirely unobstructed.
 - [x] Verify the corrected card geometry, catalog density, filters, mobile stacking, beta-interest behavior, tests, production build, and recovery backup.
+- [x] Replace compact colored dossiers with transparent white-text overlays inside companion portrait cards, using the supplied dense-grid reference as the structural target.
+- [x] Complete a documented, server-only OhAPI integration architecture and prerequisite review before connecting real models or generating external content.
+- [ ] Verify the transparent-overlay catalog, preserve existing beta behavior, and save a recoverable release with Git backup.
