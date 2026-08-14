@@ -101,7 +101,20 @@ currently necessary; the in-product gallery is bounded to six days so a dead lin
 is never rendered. Media itself is large: a generated image measured 2.5 MB.
 
 `results` also carries a `followup_text` — a line written to accompany the image
-— along with `image_prompt` and `detected_level`. Nothing consumes it yet.
+— along with `image_prompt` and `detected_level`.
+
+`image_prompt` is the prompt the provider actually generated from, which is a
+rewrite of the one we sent. It is now read back on `getOhApiJobStatus` and
+surfaced to the owner on `media.jobStatus`. This is the only view we have of
+that rewrite, and it is what separates a prompt problem from a model problem
+when a result looks poor — without it, image quality is guesswork.
+
+The published documentation lists **no** quality, resolution, model, sampler,
+seed, or aspect-ratio parameters on any media endpoint; `{ character_id,
+prompt }` is the entire documented image request. Verified 14 August 2026. Until
+the provider exposes more, the prompt is the only quality lever we hold, which
+is why `server/ohapiChatIntent.ts` composes one rather than forwarding the
+customer's message verbatim.
 
 Every job is written to `ohapi_media_jobs` with the requesting `userId`. A job is
 only pollable by the account that created it, so a job id is never a bearer token

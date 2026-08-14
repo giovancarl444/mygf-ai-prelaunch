@@ -58,3 +58,69 @@ export function detectChatMediaRequest(message: string): ChatMediaKind | null {
   // "the pic made me want to talk" only mentions one.
   return asking.index < named.at ? named.kind : null;
 }
+
+/** What the customer called it, kept so a selfie stays a selfie. */
+const NOUN_PHRASES: readonly { pattern: RegExp; phrase: string }[] = [
+  { pattern: /\bselfies?\b/, phrase: "selfie" },
+  { pattern: /\b(?:videos?|vids?|clips?)\b/, phrase: "short video" },
+  { pattern: /\b(?:photos?|pics?|pictures?|images?|snaps?)\b/, phrase: "photo" },
+];
+
+/** Words that ask for the picture rather than describe it. */
+const SCAFFOLDING = new Set([
+  "a", "an", "the", "some", "any", "one", "another", "new", "more",
+  "me", "us", "you", "your", "u", "my", "i", "we",
+  "just", "try", "trying", "quick", "quickly", "maybe", "now", "then",
+  "please", "pls", "plz", "ok", "okay", "so", "and", "but", "to", "of",
+  "can", "could", "would", "will", "do", "does", "did",
+]);
+
+/** Openers that name the subject we already know, and add nothing to a prompt. */
+const REDUNDANT_OPENER = /^(?:of|for|to|with)\s+(?:you|yourself|u|me|us|myself)\b\s*/;
+const TRAILING_PLEASE = /\s*\b(?:please|pls|plz|thanks|thank you|babe|baby)\b\s*$/;
+
+/**
+ * Turns a chat message into a prompt worth generating from.
+ *
+ * The message is how someone asks; it is not a description of a picture.
+ * "Great, can you just try sending a photo? Trying to see if it works" is a
+ * perfectly ordinary request and a terrible prompt, and sending it verbatim is
+ * a quality problem we would be creating ourselves. So the ask is stripped and
+ * what remains — if anything — is kept as the description.
+ *
+ * The in-room flow means the provider already has the conversation, so when
+ * nothing was described the fallback leans on that rather than inventing
+ * detail she did not ask for.
+ */
+export function composeMediaPrompt(input: { kind: ChatMediaKind; message: string; name: string }): string {
+  const text = input.message.toLowerCase().replace(/\s+/g, " ").trim();
+  const noun = NOUN_PHRASES.find(entry => entry.pattern.test(text));
+  const phrase = noun?.phrase ?? (input.kind === "video" ? "short video" : "photo");
+  const found = noun?.pattern.exec(text);
+
+  let before = "";
+  let after = "";
+  if (found) {
+    const asking = ASKING.exec(text);
+    // Anything between the ask and the medium reads as a modifier: "a sexy pic".
+    before = text
+      .slice((asking?.index ?? 0) + (asking?.[0].length ?? 0), found.index)
+      .split(" ")
+      .filter(word => word && !SCAFFOLDING.has(word))
+      .slice(0, 4)
+      .join(" ");
+
+    // Anything after it, up to the end of that sentence, is the description.
+    after = (text.slice(found.index + found[0].length).split(/[.?!]/)[0] ?? "")
+      .trim()
+      .replace(REDUNDANT_OPENER, "")
+      .replace(TRAILING_PLEASE, "")
+      .trim()
+      .slice(0, 200);
+  }
+
+  const subject = [before, phrase].filter(Boolean).join(" ");
+  return after
+    ? `A ${subject} of ${input.name} ${after}.`
+    : `A ${subject} of ${input.name}, right now, wherever she is.`;
+}

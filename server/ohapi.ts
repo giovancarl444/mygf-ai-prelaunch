@@ -284,6 +284,12 @@ export type OhApiJobState = {
   errorMessage: string | null;
   /** A line the companion writes to accompany a finished generation. */
   followupText: string | null;
+  /**
+   * The prompt the provider actually generated from, which is a rewrite of the
+   * one we sent. It is the only view we have of that rewrite, and the only way
+   * to tell a prompt problem from a model problem when a result looks poor.
+   */
+  imagePrompt: string | null;
 };
 
 function readJobSubmission(body: unknown): OhApiJobSubmission {
@@ -354,6 +360,7 @@ export async function getOhApiJobStatus(jobId: string): Promise<OhApiJobState> {
     presignedUrl: readString(body, ["url", "presigned_url", "presignedUrl", "result_url", "output_url"]) ?? null,
     errorMessage: readString(body, ["error", "error_message", "errorMessage", "failure_reason"]) ?? null,
     followupText: readString(results, ["followup_text", "followupText", "caption", "message"]) ?? null,
+    imagePrompt: readString(results, ["image_prompt", "imagePrompt", "prompt", "revised_prompt"]) ?? null,
   };
 }
 

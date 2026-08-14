@@ -3,7 +3,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { adultProcedure } from "./ohapiAccess";
 import { createOhApiRoom, generateOhApiText, requestOhApiAudio, requestOhApiImage, requestOhApiVideo } from "./ohapi";
-import { type ChatMediaKind, detectChatMediaRequest } from "./ohapiChatIntent";
+import { type ChatMediaKind, composeMediaPrompt, detectChatMediaRequest } from "./ohapiChatIntent";
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import { submitMediaJob } from "./ohapiMediaJobs";
 import {
@@ -128,15 +128,22 @@ async function startRequestedMedia(input: {
   providerRoomId: string;
   message: string;
   reply: string;
+  name: string;
 }) {
+  // What she is asked is not what should be generated. The request is turned
+  // into a description first; sending the message verbatim is how you get a
+  // picture of the words "trying to see if it works".
+  const prompt = input.kind === "audio"
+    ? input.reply
+    : composeMediaPrompt({ kind: input.kind, message: input.message, name: input.name });
+
   try {
     const submitted = await submitMediaJob({
       userId: input.userId,
       kind: input.kind,
-      // A voice note says the line she just wrote. A photo or a video is
-      // described by what was asked for; the in-room flow supplies the rest of
-      // the context from the conversation itself.
-      prompt: input.kind === "audio" ? input.reply : input.message,
+      // Recorded as sent, so the gallery and any later diagnosis show the
+      // prompt the provider actually received.
+      prompt,
       ohapiCharacterId: input.ohapiCharacterId,
       roomId: input.roomId,
       submit: () => {
@@ -150,13 +157,13 @@ async function startRequestedMedia(input: {
         if (input.kind === "video") {
           return requestOhApiVideo({
             characterId: input.providerCharacterId,
-            prompt: input.message,
+            prompt,
           });
         }
         return requestOhApiImage({
           characterId: input.providerCharacterId,
           roomId: input.providerRoomId,
-          prompt: input.message,
+          prompt,
         });
       },
     });
@@ -305,6 +312,7 @@ export const ohapiChatRouter = router({
           providerRoomId: room.providerRoomId,
           message: input.message,
           reply: reply.content,
+          name: character.displayName.split(" ")[0] || character.displayName,
         })
         : null;
 

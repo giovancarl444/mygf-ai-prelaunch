@@ -112,6 +112,7 @@ export const ohapiMediaRouter = router({
         resultUrl: job.resultUrl,
         followupText: job.followupText,
         errorMessage: job.errorMessage,
+        imagePrompt: null,
       };
     }
 
@@ -145,6 +146,10 @@ export const ohapiMediaRouter = router({
       resultUrl: nextStatus === "completed" ? state.presignedUrl : null,
       followupText: nextStatus === "completed" ? state.followupText : null,
       errorMessage: nextStatus === "failed" ? "That generation could not be completed. Please try a different prompt." : null,
+      // Owner-only. The provider rewrites the prompt before generating, and
+      // this is the only place that rewrite is visible — which is what tells a
+      // prompt problem apart from a model problem when a result looks poor.
+      imagePrompt: ctx.user.role === "admin" ? state.imagePrompt : null,
     };
   }),
 

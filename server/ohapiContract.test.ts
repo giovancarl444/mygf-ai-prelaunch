@@ -174,7 +174,23 @@ describe("verified OhAPI request contract", () => {
       presignedUrl: "https://example.test/out.png",
       errorMessage: null,
       followupText: "Thinking of you.",
+      imagePrompt: null,
     });
+  });
+
+  /**
+   * The provider rewrites the prompt before generating and reports the rewrite
+   * on `results.image_prompt`. Reading it is what makes a poor result
+   * diagnosable rather than a guess.
+   */
+  it("reads back the prompt the provider actually generated from", async () => {
+    respondWith({
+      status: "completed",
+      url: "https://example.test/out.png",
+      results: { image_prompt: "A photo of Sienna, golden hour, 85mm", detected_level: 2 },
+    });
+    const state = await getOhApiJobStatus("job-1");
+    expect(state.imagePrompt).toBe("A photo of Sienna, golden hour, 85mm");
   });
 
   it("still reads presigned_url when the status endpoint uses that spelling", async () => {
