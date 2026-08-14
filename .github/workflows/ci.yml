@@ -33,15 +33,22 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # The build must be silent. An unset %VITE_*% placeholder in index.html
-      # ships literally and returns 400 on every page load, and it only ever
-      # surfaced as a build warning.
-      - name: Build, failing on any warning
+      # The build must be free of correctness warnings. An unset %VITE_*%
+      # placeholder in index.html ships literally and returns 400 on every page
+      # load, and it only ever surfaced as a build warning.
+      #
+      # Chunk-size notices are excluded on purpose: they are a performance
+      # advisory against a fixed 500 kB threshold, not a defect, and the bundle
+      # is larger in the deployed environment than in CI because the platform
+      # runtime injects its own code. Treating that as a failure blocks
+      # deployment over something that is not broken.
+      - name: Build, failing on correctness warnings
         run: |
           set -o pipefail
           pnpm build 2>&1 | tee build.log
-          if grep -q "(!)" build.log; then
-            echo "::error::The build emitted warnings. See the log above."
+          if grep "(!)" build.log | grep -qv "chunks are larger than"; then
+            echo "::error::The build emitted a correctness warning:"
+            grep "(!)" build.log | grep -v "chunks are larger than"
             exit 1
           fi
 

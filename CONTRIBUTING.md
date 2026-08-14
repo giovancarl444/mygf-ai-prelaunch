@@ -72,10 +72,15 @@ All three must pass:
 ```
 pnpm check     # TypeScript
 pnpm test      # deterministic suite, no network
-pnpm build     # production build, and it must emit no warnings
+pnpm build     # production build
 ```
 
-A failing or noisy build is not ready, regardless of how the page looks.
+The build must emit no **correctness** warnings. Vite's "chunks are larger than
+500 kB" notice is a performance advisory, not a defect, and does not block — the
+deployed bundle is larger than a local one because the platform runtime injects
+its own code. Everything else marked `(!)` does block, because that is how an
+unset `%VITE_*%` placeholder announced itself while returning 400 on every page
+load.
 
 ## Where things are written down
 
