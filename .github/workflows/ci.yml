@@ -1,0 +1,90 @@
+name: CI
+
+# Two agents push to this repository. This runs the same gates on every push and
+# pull request so a bad change is caught by the repository rather than by
+# someone noticing later.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm check
+
+      - name: Test
+        run: pnpm test
+
+      # The build must be silent. An unset %VITE_*% placeholder in index.html
+      # ships literally and returns 400 on every page load, and it only ever
+      # surfaced as a build warning.
+      - name: Build, failing on any warning
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+          if grep -q "(!)" build.log; then
+            echo "::error::The build emitted warnings. See the log above."
+            exit 1
+          fi
+
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only meaningful on a pull request, where there is a base to compare with.
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The ownership split in CONTRIBUTING.md is a written rule. This makes a
+      # crossing visible in the pull request instead of relying on review.
+      - name: Flag changes outside the frontend boundary
+        run: |
+          BASE="origin/${{ github.base_ref }}"
+          CHANGED=$(git diff --name-only "$BASE"...HEAD)
+          echo "Changed files:"; echo "$CHANGED"
+
+          BACKEND=$(echo "$CHANGED" | grep -E '^(server/|drizzle/|scripts/)' || true)
+          if [ -n "$BACKEND" ]; then
+            echo "::warning::This branch changes server, drizzle or scripts:"
+            echo "$BACKEND" | while read -r f; do echo "::warning file=$f::Outside the frontend boundary — see CONTRIBUTING.md"; done
+          fi
+
+      - name: Block reintroduced defects
+        run: |
+          fail=0
+
+          # An unset Vite placeholder in index.html returns 400 on every page load.
+          if grep -nE '%VITE_[A-Z_]+%' client/index.html 2>/dev/null; then
+            echo "::error file=client/index.html::Unset Vite placeholder — inject from main.tsx only when defined."
+            fail=1
+          fi
+
+          # The catalog comes from the provider. A hard-coded list puts cards on
+          # the page that cannot be opened.
+          if grep -rlnE 'companionWorlds|const companions\s*(:|=)\s*\[' client/src/pages 2>/dev/null; then
+            echo "::error::Hard-coded companion list in a page — the catalog comes from the provider."
+            fail=1
+          fi
+
+          exit $fail
