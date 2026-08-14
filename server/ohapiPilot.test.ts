@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import { OhApiError } from "./ohapi";
+import { describeOhapiTextAllowance, HOURLY_TEXT_LIMIT } from "./ohapiDb";
 import { providerFailure } from "./ohapiPilot";
 
 function createAnonymousContext(): TrpcContext {
@@ -39,6 +40,13 @@ describe("OhAPI pilot authorization", () => {
       dateOfBirth: "1998-05-19",
     })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
+
+  it("rejects anonymous thread-management and reporting requests", async () => {
+    const caller = appRouter.createCaller(createAnonymousContext());
+    await expect(caller.ohapiPilot.renameThread({ roomId: 1, title: "Private thread" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.ohapiPilot.clearThread({ roomId: 1 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.ohapiPilot.report({ roomId: 1, reason: "quality" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
 });
 
 describe("OhAPI pilot provider-error mapping", () => {
@@ -67,5 +75,19 @@ describe("OhAPI pilot provider-error mapping", () => {
       expect(error).toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: "The companion service is temporarily unavailable." });
       expect(String((error as Error).message)).not.toContain("raw provider stack trace");
     }
+  });
+});
+
+describe("OhAPI pilot hourly text allowance", () => {
+  const boundary = new Date("2026-08-14T12:42:16.000Z");
+
+  it("allows exactly eight text attempts in one UTC hour", () => {
+    expect(describeOhapiTextAllowance(HOURLY_TEXT_LIMIT, boundary)).toMatchObject({ allowed: true, remaining: 0 });
+  });
+
+  it("blocks the ninth text attempt and calculates the next UTC-hour reset", () => {
+    const allowance = describeOhapiTextAllowance(HOURLY_TEXT_LIMIT + 1, boundary);
+    expect(allowance).toMatchObject({ allowed: false, remaining: 0 });
+    expect(allowance.resetAt.toISOString()).toBe("2026-08-14T13:00:00.000Z");
   });
 });

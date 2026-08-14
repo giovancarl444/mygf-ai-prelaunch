@@ -43,10 +43,12 @@ export const ohapiRooms = mysqlTable("ohapi_rooms", {
   providerRoomId: varchar("providerRoomId", { length: 160 }).notNull().unique(),
   userGender: mysqlEnum("userGender", ["male", "female"]).notNull(),
   textingStyle: mysqlEnum("textingStyle", ["default", "short-form", "long-form"]).default("default").notNull(),
+  title: varchar("title", { length: 120 }),
+  deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   lastUsedAt: timestamp("lastUsedAt").defaultNow().notNull(),
 }, table => ({
-  userCharacterUnique: uniqueIndex("ohapi_rooms_user_character_unique").on(table.userId, table.ohapiCharacterId),
+  userCharacterIndex: index("ohapi_rooms_user_character_index").on(table.userId, table.ohapiCharacterId),
   userIndex: index("ohapi_rooms_user_index").on(table.userId),
 }));
 
@@ -75,6 +77,31 @@ export const ohapiMediaJobs = mysqlTable("ohapi_media_jobs", {
   roomIndex: index("ohapi_media_jobs_room_index").on(table.roomId),
 }));
 
+export const ohapiReports = mysqlTable("ohapi_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  roomId: int("roomId").notNull().references(() => ohapiRooms.id),
+  messageId: int("messageId").references(() => ohapiMessages.id),
+  reason: mysqlEnum("reason", ["safety", "quality", "other"]).notNull(),
+  detail: varchar("detail", { length: 800 }),
+  status: mysqlEnum("status", ["open", "reviewed", "closed"]).default("open").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  userCreatedIndex: index("ohapi_reports_user_created_index").on(table.userId, table.createdAt),
+  roomIndex: index("ohapi_reports_room_index").on(table.roomId),
+}));
+
+export const ohapiRateLimits = mysqlTable("ohapi_rate_limits", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  bucketKey: varchar("bucketKey", { length: 32 }).notNull(),
+  requestCount: int("requestCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  userBucketUnique: uniqueIndex("ohapi_rate_limits_user_bucket_unique").on(table.userId, table.bucketKey),
+}));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type BetaInterest = typeof betaInterests.$inferSelect;
@@ -87,3 +114,7 @@ export type OhapiMessage = typeof ohapiMessages.$inferSelect;
 export type InsertOhapiMessage = typeof ohapiMessages.$inferInsert;
 export type OhapiMediaJob = typeof ohapiMediaJobs.$inferSelect;
 export type InsertOhapiMediaJob = typeof ohapiMediaJobs.$inferInsert;
+export type OhapiReport = typeof ohapiReports.$inferSelect;
+export type InsertOhapiReport = typeof ohapiReports.$inferInsert;
+export type OhapiRateLimit = typeof ohapiRateLimits.$inferSelect;
+export type InsertOhapiRateLimit = typeof ohapiRateLimits.$inferInsert;

@@ -10,12 +10,16 @@ import {
   saveOhApiCharacterDraft,
 } from "./ohapi";
 import {
+  clearOwnedOhapiRoom,
+  consumeOhapiTextAllowance,
   createOhapiMessage,
+  createOhapiReport,
   createOwnedOhapiRoom,
   getApprovedOhapiCharacter,
   getOwnedOhapiRoom,
   listApprovedOhapiCharacters,
   listOwnedOhapiMessages,
+  renameOwnedOhapiRoom,
   touchOhapiRoom,
   upsertApprovedOhapiCharacter,
 } from "./ohapiDb";
@@ -35,6 +39,8 @@ const characterDraftSchema = z.object({
   biography: z.string().trim().min(20).max(1_200),
   gender: z.enum(["Female", "Male"]),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use an ISO date in YYYY-MM-DD format."),
+  job: z.string().trim().min(2).max(120).optional(),
+  whereYouLive: z.string().trim().min(2).max(160).optional(),
 }).superRefine((input, ctx) => {
   const date = new Date(`${input.dateOfBirth}T00:00:00Z`);
   const age = Math.floor((Date.now() - date.getTime()) / (365.2425 * 24 * 60 * 60 * 1000));
@@ -86,7 +92,11 @@ export const ohapiPilotRouter = router({
     const character = await getApprovedOhapiCharacter(input.worldSlug);
     if (!character) return { character: null, messages: [] };
     const room = await getOwnedOhapiRoom({ userId: ctx.user.id, ohapiCharacterId: character.id });
-    return { character, messages: room ? await listOwnedOhapiMessages(room.id) : [] };
+    return {
+      character,
+      room: room ? { id: room.id, title: room.title } : null,
+      messages: room ? await listOwnedOhapiMessages(room.id) : [],
+    };
   }),
   open: protectedProcedure.input(setupSchema).mutation(async ({ ctx, input }) => {
     const { character, room } = await ensureOwnedRoom({ ...input, userId: ctx.user.id });
@@ -96,15 +106,45 @@ export const ohapiPilotRouter = router({
     prompt: z.string().trim().min(1, "Write a message before sending.").max(1_200, "Messages are limited to 1,200 characters for the pilot."),
   })).mutation(async ({ ctx, input }) => {
     const { room } = await ensureOwnedRoom({ ...input, userId: ctx.user.id });
+    const allowance = await consumeOhapiTextAllowance(ctx.user.id);
+    if (!allowance.allowed) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: `The text pilot allows eight messages per hour. Try again after ${allowance.resetAt.toISOString().slice(11, 16)} UTC.`,
+      });
+    }
     await createOhapiMessage({ roomId: room.id, role: "user", content: input.prompt });
     try {
       const content = await generateOhApiText({ roomId: room.providerRoomId, prompt: input.prompt });
       await createOhapiMessage({ roomId: room.id, role: "assistant", content });
       await touchOhapiRoom(room.id);
-      return { content };
+      return { content, remaining: allowance.remaining, resetAt: allowance.resetAt };
     } catch (error) {
       return providerFailure(error);
     }
+  }),
+  renameThread: protectedProcedure.input(z.object({
+    roomId: z.number().int().positive(),
+    title: z.string().trim().min(1).max(120),
+  })).mutation(async ({ ctx, input }) => {
+    const room = await renameOwnedOhapiRoom({ userId: ctx.user.id, roomId: input.roomId, title: input.title });
+    if (!room) throw new TRPCError({ code: "NOT_FOUND", message: "This private thread is no longer available." });
+    return { id: room.id, title: room.title };
+  }),
+  clearThread: protectedProcedure.input(z.object({ roomId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const cleared = await clearOwnedOhapiRoom({ userId: ctx.user.id, roomId: input.roomId });
+    if (!cleared) throw new TRPCError({ code: "NOT_FOUND", message: "This private thread is no longer available." });
+    return { cleared: true };
+  }),
+  report: protectedProcedure.input(z.object({
+    roomId: z.number().int().positive(),
+    messageId: z.number().int().positive().optional(),
+    reason: z.enum(["safety", "quality", "other"]),
+    detail: z.string().trim().max(800).optional(),
+  })).mutation(async ({ ctx, input }) => {
+    const submitted = await createOhapiReport({ ...input, userId: ctx.user.id });
+    if (!submitted) throw new TRPCError({ code: "NOT_FOUND", message: "That report target is no longer available." });
+    return { submitted: true };
   }),
   admin: router({
     generateDraft: adminProcedure.input(characterDraftSchema).mutation(async ({ input }) => {

@@ -29,6 +29,20 @@
       "when": 1786708660320,
       "tag": "0003_lumpy_harry_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1786711462975,
+      "tag": "0004_chief_hammerhead",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1786711549914,
+      "tag": "0005_steady_rage",
+      "breakpoints": true
     }
   ]
 }

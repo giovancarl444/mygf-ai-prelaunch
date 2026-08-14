@@ -1,0 +1,48 @@
+.pilot-thread-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.pilot-thread-title,
+.pilot-thread-actions,
+.pilot-clear-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pilot-thread-title { min-width: 0; flex: 1; color: #edacd1; }
+.pilot-thread-title input { min-width: 0; flex: 1; color: #fff; border: 0; outline: 0; background: transparent; font-size: 12px; font-weight: 700; }
+.pilot-thread-tools button { height: 28px; font-size: 11px; }
+.pilot-thread-actions button { color: rgba(255,255,255,.68); }
+.pilot-clear-confirm { color: #ffbdcf; font-size: 11px; }
+
+.pilot-report {
+  display: grid;
+  grid-template-columns: .7fr 1.3fr auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid rgba(255, 171, 205, 0.2);
+  background: rgba(255, 122, 183, 0.06);
+}
+
+.pilot-report label { display: grid; gap: 6px; color: rgba(255,255,255,.75); font-size: 11px; font-weight: 700; }
+.pilot-report textarea { min-height: 38px; padding: 8px; color: #fff; border: 1px solid rgba(255,255,255,.13); border-radius: 8px; background: rgba(0,0,0,.18); resize: vertical; }
+.pilot-report button { height: 36px; color: #260d21; background: linear-gradient(135deg,#fa9acb,#b989ff); }
+.pilot-limit-note { margin: 8px 2px 10px; color: rgba(255,255,255,.5); font-size: 10px; line-height: 1.45; }
+
+@media (max-width: 720px) {
+  .pilot-thread-tools { align-items: flex-start; flex-direction: column; }
+  .pilot-thread-title { width: 100%; }
+  .pilot-thread-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+  .pilot-report { grid-template-columns: 1fr; }
+  .pilot-report button { width: max-content; }
+}

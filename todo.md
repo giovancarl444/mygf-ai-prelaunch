@@ -63,3 +63,9 @@
 - [x] Create one private Sienna Vale OhAPI draft, review the provider result, explicitly save it only after review, map its durable character ID, and validate one account-owned text room.
 - [x] Regenerate the private Sienna Vale candidate with an independent creative-professional direction, then select and save only the brand-aligned reviewed result.
 - [x] Validate the Sienna owner test room using the user-specified male provider context, while retaining explicit per-user selection and no gender inference in the product.
+- [x] Define and migrate the beta-control schema for conversation names, deletion state, reports, and per-user rate-limit records.
+- [x] Add protected conversation rename/delete controls, in-chat reporting, and server-enforced per-user message limits.
+- [x] Verify successful owner-path thread rename, private report persistence, and local transcript clear behavior using the non-personal Sienna pilot test thread.
+- [x] Extend the owner-only companion workflow to prepare a second approved adult fictional world without publishing unreviewed provider content.
+- [x] Verify beta controls, authorization, rate limiting, reports, tests, production build, and recovery backup.
+- [ ] Save and document the controlled-beta milestone with an immutable Git recovery reference.
