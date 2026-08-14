@@ -102,6 +102,19 @@ export const ohapiRateLimits = mysqlTable("ohapi_rate_limits", {
   userBucketUnique: uniqueIndex("ohapi_rate_limits_user_bucket_unique").on(table.userId, table.bucketKey),
 }));
 
+export const ohapiAdminAudits = mysqlTable("ohapi_admin_audits", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  action: varchar("action", { length: 80 }).notNull(),
+  providerIdentifier: varchar("providerIdentifier", { length: 160 }),
+  outcome: mysqlEnum("outcome", ["succeeded", "failed"]).notNull(),
+  detail: varchar("detail", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  userCreatedIndex: index("ohapi_admin_audits_user_created_index").on(table.userId, table.createdAt),
+  createdIndex: index("ohapi_admin_audits_created_index").on(table.createdAt),
+}));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type BetaInterest = typeof betaInterests.$inferSelect;
@@ -118,3 +131,5 @@ export type OhapiReport = typeof ohapiReports.$inferSelect;
 export type InsertOhapiReport = typeof ohapiReports.$inferInsert;
 export type OhapiRateLimit = typeof ohapiRateLimits.$inferSelect;
 export type InsertOhapiRateLimit = typeof ohapiRateLimits.$inferInsert;
+export type OhapiAdminAudit = typeof ohapiAdminAudits.$inferSelect;
+export type InsertOhapiAdminAudit = typeof ohapiAdminAudits.$inferInsert;

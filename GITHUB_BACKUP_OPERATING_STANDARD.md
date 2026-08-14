@@ -27,6 +27,12 @@ The local `main` commit and `github-backup/main` were identical at audit time. T
 
 The audit also found no tracked environment file, certificate/key file, or committed `OHAPI_API_KEY=` assignment. The provider credential remains supplied through managed server configuration rather than Git.
 
+## Playground Consolidation Record — 14 August 2026
+
+The submitted isolated playground arrived as commit `cf608d8`, which was ahead of the common source base only by the new `tools/oh-api-playground/` subtree. Before reconciliation, the managed application was preserved in checkpoint `8991ebff` and published as the immutable `backup/pre-playground-integration-20260814` tag with a matching `recovery/pre-playground-integration-20260814` branch.
+
+The tool-only commit was then merged with a non-rewriting merge commit, preserving both the production baseline and supplied playground history. The package remains private, independently buildable, and excluded from the root application dependency graph. A deterministic production-source test now blocks imports from the browser-local BYOK package, so central source control does not weaken the server-only production credential boundary.
+
 ## Protection Limitation and Mitigation
 
 GitHub reported that branch-protection and repository-ruleset configuration for this private repository requires a plan upgrade or a public repository. Those remote controls are therefore **not currently enforceable** for this repository. GitHub documents branch-protection configuration through its protected-branch endpoint. [1]

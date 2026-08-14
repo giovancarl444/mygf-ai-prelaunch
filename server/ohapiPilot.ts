@@ -12,6 +12,7 @@ import {
 import {
   clearOwnedOhapiRoom,
   consumeOhapiTextAllowance,
+  createOhapiAdminAudit,
   createOhapiMessage,
   createOhapiReport,
   createOwnedOhapiRoom,
@@ -69,6 +70,12 @@ export function requireSavedProviderCharacterId(
     });
   }
   return draft.characterId;
+}
+
+function ownerAuditFailureDetail(error: unknown) {
+  if (error instanceof OhApiError) return error.status ? `provider_${error.status}` : "provider_network";
+  if (error instanceof TRPCError && error.code === "PRECONDITION_FAILED") return "provider_unknown";
+  return "provider_unknown";
 }
 
 async function ensureOwnedRoom(input: z.infer<typeof setupSchema> & { userId: number }) {
@@ -160,10 +167,24 @@ export const ohapiPilotRouter = router({
     return { submitted: true };
   }),
   admin: router({
-    generateDraft: adminProcedure.input(characterDraftSchema).mutation(async ({ input }) => {
+    generateDraft: adminProcedure.input(characterDraftSchema).mutation(async ({ ctx, input }) => {
       try {
-        return await generateOhApiCharacterDraft(input);
+        const draft = await generateOhApiCharacterDraft(input);
+        await createOhapiAdminAudit({
+          userId: ctx.user.id,
+          action: "draft_generated",
+          providerIdentifier: draft.characterGuid,
+          outcome: "succeeded",
+          detail: "Private candidate generated; review required before save.",
+        });
+        return draft;
       } catch (error) {
+        await createOhapiAdminAudit({
+          userId: ctx.user.id,
+          action: "draft_generated",
+          outcome: "failed",
+          detail: ownerAuditFailureDetail(error),
+        });
         return providerFailure(error);
       }
     }),
@@ -174,10 +195,25 @@ export const ohapiPilotRouter = router({
         return providerFailure(error);
       }
     }),
-    saveDraft: adminProcedure.input(z.object({ characterGuid: z.string().uuid() })).mutation(async ({ input }) => {
+    saveDraft: adminProcedure.input(z.object({ characterGuid: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       try {
-        return await saveOhApiCharacterDraft(input.characterGuid);
+        const result = await saveOhApiCharacterDraft(input.characterGuid);
+        await createOhapiAdminAudit({
+          userId: ctx.user.id,
+          action: "draft_save_requested",
+          providerIdentifier: input.characterGuid,
+          outcome: "succeeded",
+          detail: "Save request accepted; provider confirmation pending.",
+        });
+        return result;
       } catch (error) {
+        await createOhapiAdminAudit({
+          userId: ctx.user.id,
+          action: "draft_save_requested",
+          providerIdentifier: input.characterGuid,
+          outcome: "failed",
+          detail: ownerAuditFailureDetail(error),
+        });
         return providerFailure(error);
       }
     }),
@@ -186,16 +222,31 @@ export const ohapiPilotRouter = router({
       displayName: z.string().trim().min(2).max(160),
       characterGuid: z.string().uuid(),
       providerCharacterId: z.string().trim().min(1).max(128),
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ ctx, input }) => {
       try {
         const draft = await getOhApiCharacterDraftStatus(input.characterGuid);
         const providerCharacterId = requireSavedProviderCharacterId(draft, input.providerCharacterId);
-        return upsertApprovedOhapiCharacter({
+        const mapped = await upsertApprovedOhapiCharacter({
           worldSlug: input.worldSlug,
           displayName: input.displayName,
           providerCharacterId,
         });
+        await createOhapiAdminAudit({
+          userId: ctx.user.id,
+          action: "character_mapping_approved",
+          providerIdentifier: providerCharacterId,
+          outcome: "succeeded",
+          detail: "World mapping approved.",
+        });
+        return mapped;
       } catch (error) {
+        await createOhapiAdminAudit({
+          userId: ctx.user.id,
+          action: "character_mapping_approved",
+          providerIdentifier: input.providerCharacterId,
+          outcome: "failed",
+          detail: ownerAuditFailureDetail(error),
+        });
         if (error instanceof TRPCError) throw error;
         return providerFailure(error);
       }

@@ -1,5 +1,6 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import {
+  ohapiAdminAudits,
   InsertOhapiCharacter,
   ohapiCharacters,
   ohapiMessages,
@@ -174,4 +175,55 @@ export async function consumeOhapiTextAllowance(userId: number, now = new Date()
   )).limit(1);
   const used = rows[0]?.requestCount ?? HOURLY_TEXT_LIMIT + 1;
   return describeOhapiTextAllowance(used, now);
+}
+
+export async function createOhapiAdminAudit(input: {
+  userId: number;
+  action: string;
+  providerIdentifier?: string;
+  outcome: "succeeded" | "failed";
+  detail?: string;
+}) {
+  const db = await requireDb();
+  await db.insert(ohapiAdminAudits).values({
+    userId: input.userId,
+    action: input.action,
+    providerIdentifier: input.providerIdentifier?.trim() || null,
+    outcome: input.outcome,
+    detail: sanitizeOhapiAdminAuditDetail(input.detail),
+  });
+}
+
+const SAFE_AUDIT_DETAILS = new Set([
+  "Private candidate generated; review required before save.",
+  "Save request accepted; provider confirmation pending.",
+  "World mapping approved.",
+  "Read-only customer-library refresh.",
+  "Status read.",
+]);
+
+export function sanitizeOhapiAdminAuditDetail(detail?: string) {
+  const normalized = detail?.trim() ?? "";
+  if (!normalized) return null;
+  if (SAFE_AUDIT_DETAILS.has(normalized) || /^Status [a-z-]+\.$/i.test(normalized) || /^provider_(400|401|403|404|422|429|500|502|503|504|network|unknown)$/.test(normalized)) return normalized;
+  return "sanitized";
+}
+
+export async function listRecentOhapiAdminAudits(limit = 25) {
+  const db = await requireDb();
+  return db.select().from(ohapiAdminAudits).orderBy(desc(ohapiAdminAudits.createdAt)).limit(limit);
+}
+
+export async function getOhapiStudioSummary() {
+  const db = await requireDb();
+  const [approved, activeRooms, openReports] = await Promise.all([
+    db.select({ total: sql<number>`count(*)` }).from(ohapiCharacters).where(eq(ohapiCharacters.status, "approved")),
+    db.select({ total: sql<number>`count(*)` }).from(ohapiRooms).where(isNull(ohapiRooms.deletedAt)),
+    db.select({ total: sql<number>`count(*)` }).from(ohapiReports).where(eq(ohapiReports.status, "open")),
+  ]);
+  return {
+    approvedCharacters: Number(approved[0]?.total ?? 0),
+    activeRooms: Number(activeRooms[0]?.total ?? 0),
+    openReports: Number(openReports[0]?.total ?? 0),
+  };
 }

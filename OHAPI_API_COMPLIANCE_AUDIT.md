@@ -30,9 +30,17 @@ MyGF.ai currently uses the provider for the documented text-room path only. Imag
 
 The local **Clear** action retires the MyGF.ai room and removes its local transcript. It does not represent a provider-side deletion request, because the existing text beta does not assume such a provider deletion contract. This distinction remains visible in the product.
 
+## Owner Studio and Playground Separation
+
+The private `/ops/ohapi` Studio is available only to the MyGF.ai owner through the existing server-enforced admin procedure. It provides a credential-configuration signal, sanitized local counts, a read-only provider-library refresh, draft-status inspection, and a concise operational ledger. It deliberately does **not** accept a browser key, expose raw provider response bodies, provide a generic request composer, or enable media, Cam, digital-twin, or unrestricted text controls.
+
+Every owner-reviewed provider mutation now records a sanitized local audit outcome. Candidate generation, save requests, and approved mappings record only the owner, action class, relevant provider identifier, success/failure outcome, and an allowlisted detail. API keys, headers, raw upstream errors, and private message content are rejected from this audit record by the persistence helper.
+
+The submitted `tools/oh-api-playground/` package remains a separately buildable, private development utility. It uses a browser-local BYOK model and retains its own package manifest, lockfile, README, and exclusions. The production application contains a regression test that prevents it from importing the package. The Studio therefore centralizes the operational workflow without adopting the playground's browser-key transport model.
+
 ## Verification Record
 
-The documentation-alignment hardening was validated by TypeScript compilation, a production build, a rendered owner-pilot review, and the deterministic suite: **20 passing tests and one intentionally skipped live-network credential probe**. The skipped probe is gated behind `RUN_OHAPI_LIVE_TESTS=true` to prevent routine test runs from accessing the provider.
+The combined contract and Studio hardening was validated by TypeScript compilation, independent production builds for the main application and isolated playground, desktop/mobile Studio review, authorization and package-isolation tests, and the deterministic suite: **28 passing tests and one intentionally skipped live-network credential probe**. The skipped probe is gated behind `RUN_OHAPI_LIVE_TESTS=true` to prevent routine test runs from accessing the provider.
 
 ## References
 

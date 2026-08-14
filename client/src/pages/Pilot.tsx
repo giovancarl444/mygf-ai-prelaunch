@@ -147,7 +147,7 @@ export default function Pilot() {
     <main className="pilot-shell">
       <header className="pilot-header">
         <Link href="/" className="pilot-brand"><span className="brand-mark" aria-hidden="true"><span /></span><span>mygf<span>.ai</span></span></Link>
-        <div><span className="pilot-kicker"><span />Live pilot · Text only</span><Link href="/" className="pilot-exit"><ArrowLeft size={15} />Back to worlds</Link></div>
+        <div><span className="pilot-kicker"><span />Live pilot · Text only</span>{user?.role === "admin" && <Link href="/ops/ohapi" className="pilot-exit">Owner Studio</Link>}<Link href="/" className="pilot-exit"><ArrowLeft size={15} />Back to worlds</Link></div>
       </header>
 
       <section className="pilot-intro" aria-labelledby="pilot-title">

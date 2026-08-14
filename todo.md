@@ -74,9 +74,11 @@
 - [x] Require a provider-confirmed `saved` character status and matching durable `characterId` before a newly generated companion can be mapped, and add safe GET-only transient retry coverage.
 - [x] Audit Git remotes, branch and tag protections, recovery references, ignore rules, and restore readiness.
 - [x] Publish an authoritative integration-and-recovery operating record, then save a new recoverable checkpoint and Git backup.
-- [ ] Save and verify a pre-playground-integration checkpoint with a matching Git recovery reference.
-- [ ] Inspect and reconcile the submitted `cf608d8` playground source against the current MyGF.ai recovery baseline.
-- [ ] Add an owner-only, server-mediated OhAPI Studio without browser-local credential handling or generic provider proxying.
-- [ ] Add a sanitized owner-operation audit trail for reviewed provider actions.
-- [ ] Retain the reviewed playground as an isolated private package that builds independently and is not imported by the production application.
+- [x] Save and verify a pre-playground-integration checkpoint with a matching Git recovery reference.
+- [x] Inspect and reconcile the submitted `cf608d8` playground source against the current MyGF.ai recovery baseline.
+- [x] Add an owner-only, server-mediated OhAPI Studio without browser-local credential handling or generic provider proxying.
+- [x] Add a sanitized owner-operation audit trail for every reviewed provider action.
+- [x] Retain the reviewed playground as an isolated private package that builds independently and is not imported by the production application.
+- [x] Log sanitized audit outcomes for draft generation, save confirmation, and approved-character mapping, with deterministic mutation-level coverage for success and failure paths.
+- [x] Add an automated isolation check proving the production application does not import from `tools/oh-api-playground/`.
 - [ ] Verify authorization, credential isolation, independent builds, visual behavior, recovery restore, and Git backup for the consolidation milestone.
