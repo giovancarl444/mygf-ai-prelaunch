@@ -43,7 +43,7 @@ const characterDraftSchema = z.object({
   }
 });
 
-function providerFailure(error: unknown): never {
+export function providerFailure(error: unknown): never {
   if (error instanceof OhApiError) {
     if (error.status === 400) throw new TRPCError({ code: "BAD_REQUEST", message: "The provider could not accept that message. Please revise it and try again." });
     if (error.status === 401 || error.status === 403) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The pilot connection is not enabled for this action yet." });
