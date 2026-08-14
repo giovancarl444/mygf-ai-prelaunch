@@ -15,4 +15,4 @@
 - [x] Save the completed web project checkpoint, publish it, and report the live URL plus Git backup status.
 - [x] Verify the published release and document the canonical production URL.
 - [x] Create and push a final immutable Git release tag and recovery branch for the published version.
-- [ ] Save a post-publication recovery checkpoint and document restoration identifiers.
+- [x] Save a post-publication recovery checkpoint and document restoration identifiers.
