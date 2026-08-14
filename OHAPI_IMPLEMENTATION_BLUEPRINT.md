@@ -37,6 +37,10 @@ The server should expose narrow internal procedures rather than proxying the pro
 
 The project needs one secure project secret: `OHAPI_API_KEY`. It must be stored server-side and never passed to React, HTML, browser logs, analytics, or Git. The first connectivity test should be a non-generative authenticated discovery call from the server, followed by a single approved-character room and a single non-explicit text exchange. The real-model conversation interface should remain disabled until that sequence succeeds and the resulting content, error handling, and cost behavior have been manually reviewed.
 
+### Provider Room Context
+
+OhAPI currently requires a supported `user_gender` value when it creates a room. MyGF.ai presents this as an **explicit per-user room-context selection** and must never infer it from a person’s name, profile, browsing behavior, or companion choice. The owner explicitly selected `male` for the first private test room; that value applies only to that account-owned room. [1]
+
 > **Do not begin with explicit media generation.** OhAPI documents that explicit content needs verified adult-partner permissions, while media work is asynchronous and outputs use expiring presigned URLs. The correct technical sequence is text-only validation first, then owner-controlled non-public character generation, then optional media jobs with durable managed storage. [1]
 
 ## Error and Operations Policy

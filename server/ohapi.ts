@@ -102,6 +102,8 @@ export type OhApiDraftCharacterInput = {
   biography: string;
   gender: "Female" | "Male";
   dateOfBirth: string;
+  job?: string;
+  whereYouLive?: string;
 };
 
 export async function generateOhApiCharacterDraft(input: OhApiDraftCharacterInput) {
@@ -117,6 +119,11 @@ export async function generateOhApiCharacterDraft(input: OhApiDraftCharacterInpu
 export async function getOhApiCharacterDraftStatus(characterGuid: string) {
   const response = await ohApiFetch(`/api/v2/characters/${encodeURIComponent(characterGuid)}/status`, { method: "GET" });
   return response.json() as Promise<{ status?: string; characterId?: string; errorMessage?: string; [key: string]: unknown }>;
+}
+
+export async function getOhApiCharacterDraft(characterGuid: string) {
+  const response = await ohApiFetch(`/api/v2/characters/${encodeURIComponent(characterGuid)}`, { method: "GET" });
+  return response.json() as Promise<{ character?: Record<string, unknown>; generatedProfile?: Record<string, unknown>; [key: string]: unknown }>;
 }
 
 export async function saveOhApiCharacterDraft(characterGuid: string) {

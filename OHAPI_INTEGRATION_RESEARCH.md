@@ -51,3 +51,9 @@ The provider’s runtime OpenAPI specification confirms that V2 generation requi
 ## Reference
 
 [1]: https://api.oh.xyz/openapi.json "OhAPI official OpenAPI specification"
+
+## First Live Pilot Outcome
+
+The owner-approved Sienna Vale candidate was regenerated to replace a weaker initial service-role draft, then reviewed as a fictional adult, age 28, with an independent cultural-editor role and a creative, reflective, witty profile. The selected candidate was explicitly saved through the provider workflow and received durable provider `characterId` `21555`. It is mapped internally to MyGF.ai world slug `sienna-vale` as an approved character.
+
+One owner-owned room was then created using the user-specified `male` room-context selection. A single non-explicit museum prompt produced a two-sentence provider response, and both the prompt and response were persisted as exactly two rows in the account-owned room. No image, audio, video, or public user conversation was generated as part of this validation.

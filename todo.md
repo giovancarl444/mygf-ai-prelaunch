@@ -54,6 +54,9 @@
 - [x] Verify the transparent-overlay catalog, preserve existing beta behavior, and save a recoverable release with Git backup.
 - [x] Define and migrate the OhAPI pilot schema for approved characters, user-owned rooms, conversation messages, and provider job metadata.
 - [x] Implement server-only OhAPI client functions, authentication guards, room ownership checks, provider error mapping, and an owner-controlled companion mapping.
-- [ ] Securely connect and validate the OhAPI credential using one approved adult fictional character without exposing the key to the browser.
+- [x] Securely connect and validate the OhAPI credential using one approved adult fictional character without exposing the key to the browser.
 - [x] Build an authenticated text-first companion conversation experience with clear AI and adult-only boundaries.
 - [ ] Verify persistence, authorization, provider-error behavior, tests, production build, and recovery backup for the OhAPI pilot.
+- [x] Create one private Sienna Vale OhAPI draft, review the provider result, explicitly save it only after review, map its durable character ID, and validate one account-owned text room.
+- [x] Regenerate the private Sienna Vale candidate with an independent creative-professional direction, then select and save only the brand-aligned reviewed result.
+- [x] Validate the Sienna owner test room using the user-specified male provider context, while retaining explicit per-user selection and no gender inference in the product.
