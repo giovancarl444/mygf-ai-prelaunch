@@ -9,7 +9,7 @@
 - [x] Implement a database-backed private-beta interest form with email, optional motivation selector, timestamp, and source.
 - [x] Send an owner notification containing each successful beta-interest email and selected motivation.
 - [x] Add privacy-forward form states, validation, duplicate handling, and user feedback.
-- [ ] Implement the exact footer disclaimer and an adult-only, pre-launch expectation boundary.
-- [ ] Write and run Vitest coverage for beta-interest validation, persistence behavior, duplicate handling, and notification triggering.
-- [ ] Verify desktop and mobile rendering, form behavior, accessibility, and server logs.
+- [x] Implement the exact footer disclaimer and an adult-only, pre-launch expectation boundary.
+- [x] Write and run Vitest coverage for beta-interest validation, persistence behavior, duplicate handling, and notification triggering.
+- [x] Verify desktop and mobile rendering, form behavior, accessibility, and server logs.
 - [ ] Save the completed web project checkpoint, publish it, and report the live URL plus Git backup status.

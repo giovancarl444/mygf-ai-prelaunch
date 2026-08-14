@@ -136,6 +136,7 @@ export default function Home() {
   const handleInterestSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormMessage(null);
+    if (!event.currentTarget.reportValidity()) return;
     const normalizedEmail = email.trim();
     if (!normalizedEmail) {
       setFormMessage("Please enter an email address to request beta access.");
