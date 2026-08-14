@@ -78,12 +78,31 @@ describe("verified OhAPI request contract", () => {
 
   it("sends chat as room_id, character_id and message, and reads content", async () => {
     respondWith({ content: "hello there", job_id: "j1", message_id: "m1" });
-    const content = await generateOhApiText({ roomId: "room-1", characterId: "21555", message: "hi" });
+    const reply = await generateOhApiText({ roomId: "room-1", characterId: "21555", message: "hi" });
 
     const request = lastRequest();
     expect(request.url).toBe("https://api.oh.xyz/api/v1/text");
     expect(request.body).toEqual({ room_id: "room-1", character_id: "21555", message: "hi" });
-    expect(content).toBe("hello there");
+    expect(reply.content).toBe("hello there");
+    expect(reply.messageId).toBe("m1");
+  });
+
+  /**
+   * The reply to "send me a photo of you" ignores the request entirely, so the
+   * intent is expressed somewhere other than `content`. `tool_call` is captured
+   * verbatim rather than interpreted, because its shape is undocumented.
+   */
+  it("captures tool_call without interpreting it", async () => {
+    const toolCall = { name: "send_image", arguments: { style: "selfie" } };
+    respondWith({ content: "sure, one sec", tool_call: toolCall, message_id: "m2" });
+    const reply = await generateOhApiText({ roomId: "room-1", characterId: "21555", message: "send me a photo" });
+    expect(reply.toolCall).toEqual(toolCall);
+  });
+
+  it("reports no tool_call when the provider omits it", async () => {
+    respondWith({ content: "just talking", message_id: "m3" });
+    const reply = await generateOhApiText({ roomId: "room-1", characterId: "21555", message: "hi" });
+    expect(reply.toolCall).toBeNull();
   });
 
   it("requests an image with character_id and prompt", async () => {

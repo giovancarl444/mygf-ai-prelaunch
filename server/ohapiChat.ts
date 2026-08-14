@@ -165,14 +165,22 @@ export const ohapiChatRouter = router({
     await createOhapiMessage({ roomId: room.id, role: "user", content: input.message });
 
     try {
-      const content = await generateOhApiText({
+      const reply = await generateOhApiText({
         roomId: room.providerRoomId,
         characterId: character.providerCharacterId!,
         message: input.message,
       });
-      await createOhapiMessage({ roomId: room.id, role: "assistant", content });
+      await createOhapiMessage({ roomId: room.id, role: "assistant", content: reply.content });
       await touchOhapiRoom(room.id);
-      return { content, remaining: allowance.remaining, resetAt: allowance.resetAt };
+      return {
+        content: reply.content,
+        remaining: allowance.remaining,
+        resetAt: allowance.resetAt,
+        // Owner-only diagnostic. The provider signals something here that the
+        // reply text does not express, and its shape needs observing before any
+        // behaviour is built on it.
+        toolCall: ctx.user.role === "admin" ? reply.toolCall : null,
+      };
     } catch (error) {
       if (isRefundableProviderFailure(error)) await refundOhapiAllowance(ctx.user.id, "text");
       return providerFailure(error);

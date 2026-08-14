@@ -84,7 +84,7 @@ beforeEach(() => {
   });
   provider.generateText.mockReset().mockImplementation(async () => {
     calls.push("providerGenerateText");
-    return "Hi — good to hear from you.";
+    return { content: "Hi — good to hear from you.", toolCall: null, messageId: null };
   });
   store.createMessage.mockReset();
   store.refund.mockReset();

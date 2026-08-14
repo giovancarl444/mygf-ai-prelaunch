@@ -258,7 +258,19 @@ export async function generateOhApiText(input: { roomId: string; characterId: st
   // `content` is what the live service returns; the rest are defensive.
   const content = readString(body, ["content", "reply", "response", "message", "text", "output"]);
   if (!content) throw new OhApiError("OhAPI did not return text content.");
-  return content;
+
+  // The response also carries `tool_call`. Asking the companion for a photo
+  // produces a reply that ignores the request entirely, which suggests the
+  // intent is expressed here rather than in the text. Its shape is not
+  // documented, so it is captured verbatim for inspection rather than guessed at.
+  const source = asRecord(body);
+  const rawToolCall = source.tool_call ?? source.toolCall ?? null;
+
+  return {
+    content,
+    toolCall: rawToolCall == null ? null : rawToolCall,
+    messageId: readString(body, ["message_id", "messageId"]) ?? null,
+  };
 }
 
 /* -------------------------------------------------------------------------- */

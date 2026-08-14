@@ -34,7 +34,7 @@ export default function Chat() {
   const [, navigate] = useLocation();
   const slug = params?.slug ?? "";
 
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const utils = trpc.useUtils();
 
   const session = trpc.chat.session.useQuery(undefined, { enabled: isAuthenticated });
@@ -450,6 +450,16 @@ export default function Chat() {
                   <CircleAlert size={16} />
                   {send.error.message}
                 </p>
+              )}
+
+              {/* Temporary owner-only diagnostic. The provider returns a
+                  `tool_call` alongside the reply, and a request for a photo
+                  produces a reply that ignores it — so the intent is expressed
+                  here. Shown raw until its shape is known. */}
+              {user?.role === "admin" && send.data?.toolCall != null && (
+                <pre className="chat-toolcall">
+                  tool_call: {JSON.stringify(send.data.toolCall, null, 2)}
+                </pre>
               )}
 
               <div className="chat-composer">

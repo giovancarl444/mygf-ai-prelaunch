@@ -1191,6 +1191,21 @@ p {
 
 .media-scrim { display: none; }
 
+/* Temporary owner-only diagnostic for the provider's undocumented tool_call. */
+.chat-toolcall {
+  margin: 0 16px 12px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border: 1px solid var(--accent-2);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--accent-soft);
+  font-family: ui-monospace, monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 /* The line the companion writes to accompany a finished generation. */
 .media-followup {
   margin: 0;
