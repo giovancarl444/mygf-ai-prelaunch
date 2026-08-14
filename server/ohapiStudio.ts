@@ -6,6 +6,7 @@ import {
   getOhApiCharacterDraftStatus,
   getOhApiKey,
   listOhApiCharacters,
+  OhApiError,
   validateOhApiCredential,
   saveOhApiCharacterDraft,
 } from "./ohapi";
@@ -70,8 +71,40 @@ function configured() {
   try { getOhApiKey(); return true; } catch { return false; }
 }
 
+export type CredentialState = "missing" | "ok" | "rejected" | "unreachable";
+
+/**
+ * Actually exercises the credential rather than checking it is non-empty.
+ *
+ * A present-but-dead key previously reported as "configured", so the first sign
+ * of trouble was a failed sync with a deliberately vague customer-facing
+ * message. This is owner-only, so it reports the real reason.
+ */
+export async function checkOhApiCredential(): Promise<{ state: CredentialState; detail: string }> {
+  if (!configured()) {
+    return { state: "missing", detail: "OHAPI_API_KEY is not set on the server." };
+  }
+  try {
+    await validateOhApiCredential();
+    return { state: "ok", detail: "The provider accepted this credential." };
+  } catch (error) {
+    if (error instanceof OhApiError && (error.status === 401 || error.status === 403)) {
+      // The provider's own wording is the useful part here — "API key is
+      // disabled" and "Invalid API key" are different problems.
+      return { state: "rejected", detail: error.message || `The provider rejected this credential (${error.status}).` };
+    }
+    if (error instanceof OhApiError) {
+      return { state: "unreachable", detail: `The provider could not be reached${error.status ? ` (${error.status})` : ""}.` };
+    }
+    return { state: "unreachable", detail: "The provider could not be reached." };
+  }
+}
+
 export const ohapiStudioRouter = router({
-  health: adminProcedure.query(async () => ({ configured: configured(), local: await getOhapiStudioSummary() })),
+  health: adminProcedure.query(async () => {
+    const [credential, local] = await Promise.all([checkOhApiCredential(), getOhapiStudioSummary()]);
+    return { configured: credential.state === "ok", credential, local };
+  }),
 
   recentActivity: adminProcedure.query(async () => listRecentOhapiAdminAudits()),
 
@@ -131,6 +164,14 @@ export const ohapiStudioRouter = router({
         });
       }
       if (error instanceof TRPCError) throw error;
+      // This surface is owner-only, so the actual provider reason is more
+      // useful than the customer-safe copy the rest of the app returns.
+      if (error instanceof OhApiError && (error.status === 401 || error.status === 403)) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `The provider rejected the server credential: ${error.message || error.status}. Update OHAPI_API_KEY and try again.`,
+        });
+      }
       return providerFailure(error);
     }
   }),

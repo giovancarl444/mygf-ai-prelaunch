@@ -167,10 +167,20 @@ export default function OhapiStudio() {
             <Activity size={19} />
           </div>
           <div className="studio-health-row">
-            <span className={health.data?.configured ? "studio-status studio-status-good" : "studio-status studio-status-muted"}>
-              {health.data?.configured ? <CheckCircle2 size={15} /> : <CircleAlert size={15} />}
-              {health.data?.configured ? "Server credential configured" : "Credential not configured"}
+            <span className={health.data?.credential.state === "ok" ? "studio-status studio-status-good" : "studio-status studio-status-muted"}>
+              {health.data?.credential.state === "ok" ? <CheckCircle2 size={15} /> : <CircleAlert size={15} />}
+              {health.isLoading ? "Checking credential…" : {
+                ok: "Credential accepted by provider",
+                rejected: "Credential REJECTED by provider",
+                missing: "No credential configured",
+                unreachable: "Provider unreachable",
+              }[health.data?.credential.state ?? "unreachable"]}
             </span>
+            {/* The provider's own wording distinguishes a disabled key from an
+                invalid one, which a boolean "configured" flag hid entirely. */}
+            {health.data && health.data.credential.state !== "ok" && (
+              <p className="studio-error"><CircleAlert size={14} />{health.data.credential.detail}</p>
+            )}
           </div>
           <div className="studio-metrics">
             <div><strong>{health.data?.local.publishedCompanions ?? "—"}</strong><span>published</span></div>
