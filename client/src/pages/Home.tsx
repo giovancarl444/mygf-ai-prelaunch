@@ -153,7 +153,7 @@ export default function Home() {
       <header className="map-header">
         <a className="map-brand" href="#top" aria-label="mygf.ai home"><span className="brand-mark" aria-hidden="true"><span /></span><span>mygf<span>.ai</span></span></a>
         <nav className="map-nav" aria-label="Primary navigation">
-          <a href="#worlds">Worlds</a><a href="#principles">Principles</a><a href="#how-it-works">How it works</a><a href="#faq">FAQ</a>
+          <a href="#worlds">Worlds</a><a href="/pilot">Live pilot</a><a href="#principles">Principles</a><a href="#how-it-works">How it works</a><a href="#faq">FAQ</a>
         </nav>
         <div className="header-actions"><button type="button" className="login-quiet" onClick={scrollToBeta}>Private beta</button><button type="button" className="header-access" onClick={scrollToBeta}>Request access <ArrowUpRight size={14} /></button></div>
         <button className="menu-button" type="button" aria-label="Open navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={21} /> : <Menu size={21} />}</button>

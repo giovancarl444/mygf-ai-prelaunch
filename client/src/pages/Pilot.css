@@ -1,0 +1,103 @@
+.pilot-owner-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.pilot-draft-form,
+.pilot-map-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pilot-draft-form label,
+.pilot-map-form label {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pilot-draft-form input,
+.pilot-map-form input,
+.pilot-draft-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 10px 11px;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pilot-draft-form textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.pilot-draft-form label button {
+  width: 100%;
+  margin-top: 6px;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pilot-wide-input {
+  grid-column: 1 / -1;
+}
+
+.pilot-draft-form > button,
+.pilot-map-form > button,
+.pilot-draft-status > div button:last-child {
+  width: max-content;
+  color: #1a0e21;
+  background: linear-gradient(135deg, #fa9acb, #b989ff);
+}
+
+.pilot-draft-status {
+  padding: 16px;
+  border: 1px solid rgba(230, 157, 207, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.pilot-draft-status > strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.pilot-draft-status code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #f2add2;
+  font-size: 11px;
+}
+
+.pilot-draft-status > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.pilot-draft-status p {
+  margin-top: 12px;
+}
+
+.pilot-map-form {
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 800px) {
+  .pilot-draft-form,
+  .pilot-map-form {
+    grid-template-columns: 1fr;
+  }
+
+  .pilot-wide-input {
+    grid-column: auto;
+  }
+}

@@ -15,6 +15,20 @@
       "when": 1786694392642,
       "tag": "0001_orange_timeslip",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786708508705,
+      "tag": "0002_broken_franklin_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1786708660320,
+      "tag": "0003_lumpy_harry_osborn",
+      "breakpoints": true
     }
   ]
 }

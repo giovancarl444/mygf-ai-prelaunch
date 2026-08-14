@@ -3,6 +3,7 @@ import { betaInterestInputSchema, submitBetaInterest } from "./betaInterest";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import { ohapiPilotRouter } from "./ohapiPilot";
 
 export const appRouter = router({
   system: systemRouter,
@@ -17,6 +18,7 @@ export const appRouter = router({
   betaInterest: router({
     submit: publicProcedure.input(betaInterestInputSchema).mutation(({ input }) => submitBetaInterest(input)),
   }),
+  ohapiPilot: ohapiPilotRouter,
 });
 
 export type AppRouter = typeof appRouter;

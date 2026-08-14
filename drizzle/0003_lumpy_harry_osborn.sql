@@ -1,0 +1,1 @@
+ALTER TABLE `ohapi_rooms` ADD `userGender` enum('male','female') NOT NULL;

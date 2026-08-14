@@ -37,3 +37,17 @@ The official text endpoint is `POST /api/v1/text`. It requires the partner key, 
 OhAPI’s documented V2 creation path is `POST /api/v2/characters/generate`, followed by status polling at `GET /api/v2/characters/{characterGuid}/status` every 2–3 seconds until `ready`, explicit approval and `POST /api/v2/characters/save`, then a second status poll until `saved`. The final saved status returns the durable `characterId` required for text, images, and video. The documentation cautions that a saved character’s images cannot be regenerated; a new generation must be created and approved instead. MyGF.ai should therefore use a private owner-only review queue and create a catalog record only after the saved status is confirmed.
 
 The interactive documentation visibly documents the lifecycle and approved attribute-catalog endpoints, but its expanded generation-field table did not remain reachable through the current rendered control state. The correct next implementation step is not to invent those fields: obtain the credential securely, run only a documented low-impact authenticated discovery call, and then confirm the generate schema from the provider’s live reference before enabling any owner-generation form.
+
+## Live Credential Validation Note
+
+The secure key was successfully validated against the documented authenticated customer-library endpoint. The account currently returns an empty `characters` collection and an empty `digitalTwins` collection. A subsequent call to the documentation-listed `GET /api/v1/characters` endpoint returned the provider error `Unknown endpoint: /api/v1/characters`; it has therefore been deliberately excluded from the application. The pilot uses an explicit owner-approved provider-character mapping instead of assuming a public discovery route exists. No generation, room, text, image, audio, or video call has been made.
+
+The official documentation client bundles its character endpoint UI around a runtime OpenAPI specification rather than exposing the V2 generation-field table in static markup. The published lifecycle remains confirmed—generate, poll `characterGuid`, review, save, then use the durable `characterId`—but the exact generation request body must be read from the authenticated live reference before an owner submission is attempted. The pilot deliberately does not invent or send a character-generation payload.
+
+## V2 Generation Contract Recovered from Official OpenAPI
+
+The provider’s runtime OpenAPI specification confirms that V2 generation requires `nationality`, `ethnicity`, `firstName`, `lastName`, `biography`, and `gender`. It supports an optional ISO `dateOfBirth`, but the documentation states that any supplied date must establish an age of at least 21. The `202` response returns a `characterGuid` for polling; only after owner review, `save`, and a `saved` status does the durable `characterId` become available for rooms and text. MyGF.ai retains the stricter product rule that all mapped companion worlds are clearly fictional adults aged `21+` and that no unreviewed generation can enter the public catalog. [1]
+
+## Reference
+
+[1]: https://api.oh.xyz/openapi.json "OhAPI official OpenAPI specification"

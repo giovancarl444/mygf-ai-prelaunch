@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -25,7 +25,65 @@ export const betaInterests = mysqlTable("beta_interests", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const ohapiCharacters = mysqlTable("ohapi_characters", {
+  id: int("id").autoincrement().primaryKey(),
+  worldSlug: varchar("worldSlug", { length: 120 }).notNull().unique(),
+  displayName: varchar("displayName", { length: 160 }).notNull(),
+  providerCharacterId: varchar("providerCharacterId", { length: 128 }).unique(),
+  status: mysqlEnum("status", ["draft", "approved", "disabled"]).default("draft").notNull(),
+  approvedAt: timestamp("approvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const ohapiRooms = mysqlTable("ohapi_rooms", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  ohapiCharacterId: int("ohapiCharacterId").notNull().references(() => ohapiCharacters.id),
+  providerRoomId: varchar("providerRoomId", { length: 160 }).notNull().unique(),
+  userGender: mysqlEnum("userGender", ["male", "female"]).notNull(),
+  textingStyle: mysqlEnum("textingStyle", ["default", "short-form", "long-form"]).default("default").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastUsedAt: timestamp("lastUsedAt").defaultNow().notNull(),
+}, table => ({
+  userCharacterUnique: uniqueIndex("ohapi_rooms_user_character_unique").on(table.userId, table.ohapiCharacterId),
+  userIndex: index("ohapi_rooms_user_index").on(table.userId),
+}));
+
+export const ohapiMessages = mysqlTable("ohapi_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  roomId: int("roomId").notNull().references(() => ohapiRooms.id),
+  role: mysqlEnum("role", ["user", "assistant"]).notNull(),
+  content: text("content").notNull(),
+  providerRequestId: varchar("providerRequestId", { length: 160 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  roomCreatedIndex: index("ohapi_messages_room_created_index").on(table.roomId, table.createdAt),
+}));
+
+export const ohapiMediaJobs = mysqlTable("ohapi_media_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  roomId: int("roomId").references(() => ohapiRooms.id),
+  providerJobId: varchar("providerJobId", { length: 160 }).notNull().unique(),
+  kind: mysqlEnum("kind", ["image", "audio", "video"]).notNull(),
+  status: mysqlEnum("status", ["pending", "completed", "failed", "expired"]).default("pending").notNull(),
+  resultKey: varchar("resultKey", { length: 512 }),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  roomIndex: index("ohapi_media_jobs_room_index").on(table.roomId),
+}));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type BetaInterest = typeof betaInterests.$inferSelect;
 export type InsertBetaInterest = typeof betaInterests.$inferInsert;
+export type OhapiCharacter = typeof ohapiCharacters.$inferSelect;
+export type InsertOhapiCharacter = typeof ohapiCharacters.$inferInsert;
+export type OhapiRoom = typeof ohapiRooms.$inferSelect;
+export type InsertOhapiRoom = typeof ohapiRooms.$inferInsert;
+export type OhapiMessage = typeof ohapiMessages.$inferSelect;
+export type InsertOhapiMessage = typeof ohapiMessages.$inferInsert;
+export type OhapiMediaJob = typeof ohapiMediaJobs.$inferSelect;
+export type InsertOhapiMediaJob = typeof ohapiMediaJobs.$inferInsert;
