@@ -12,7 +12,8 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { trpc } from "@/lib/trpc";
 
 const companionWorlds = [
   {
@@ -95,6 +96,12 @@ const howItWorks = [
   },
 ];
 
+type InterestChoice =
+  | "story/character continuity"
+  | "reflective conversation"
+  | "imaginative roleplay"
+  | "curious about AI";
+
 function scrollToBeta() {
   document.getElementById("beta-interest")?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -102,7 +109,20 @@ function scrollToBeta() {
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [email, setEmail] = useState("");
-  const [interest, setInterest] = useState("");
+  const [interest, setInterest] = useState<InterestChoice | "">("");
+  const [formMessage, setFormMessage] = useState<string | null>(null);
+  const submitInterest = trpc.betaInterest.submit.useMutation({
+    onSuccess: result => {
+      if (result.status === "already_registered") {
+        setFormMessage("You are already on the private beta interest list.");
+        return;
+      }
+      setEmail("");
+      setInterest("");
+      setFormMessage("Thank you — your private beta interest has been received.");
+    },
+    onError: () => setFormMessage("We could not save your interest right now. Please try again shortly."),
+  });
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
@@ -111,6 +131,17 @@ export default function Home() {
   const closeMenuAndScroll = (target: string) => {
     setMenuOpen(false);
     window.setTimeout(() => document.querySelector(target)?.scrollIntoView({ behavior: "smooth" }), 40);
+  };
+
+  const handleInterestSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFormMessage(null);
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setFormMessage("Please enter an email address to request beta access.");
+      return;
+    }
+    submitInterest.mutate({ email: normalizedEmail, interest: interest || undefined });
   };
 
   return (
@@ -247,12 +278,12 @@ export default function Home() {
               <h2 id="beta-title">Join the first<br /><em>worlds in progress.</em></h2>
               <p>We are inviting a limited group of adults to help shape the early MyGF.ai experience. Leave your interest, and we will be in touch when the private beta opens.</p>
             </div>
-            <form className="interest-form" onSubmit={(event) => event.preventDefault()} noValidate>
+            <form className="interest-form" onSubmit={handleInterestSubmit} noValidate>
               <label htmlFor="interest-email">Email address</label>
               <input id="interest-email" name="email" type="email" placeholder="you@example.com" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
               <label htmlFor="interest-draw">What draws you here <span>optional</span></label>
               <div className="select-wrap">
-                <select id="interest-draw" name="interest" value={interest} onChange={(event) => setInterest(event.target.value)}>
+                <select id="interest-draw" name="interest" value={interest} onChange={(event) => setInterest(event.target.value as InterestChoice | "")}>
                   <option value="">Choose an answer</option>
                   <option value="story/character continuity">story/character continuity</option>
                   <option value="reflective conversation">reflective conversation</option>
@@ -261,8 +292,9 @@ export default function Home() {
                 </select>
                 <ChevronDown size={17} aria-hidden="true" />
               </div>
-              <button className="button button-primary form-submit" type="submit">Request beta access <ArrowUpRight size={17} /></button>
+              <button className="button button-primary form-submit" type="submit" disabled={submitInterest.isPending}>{submitInterest.isPending ? "Saving your interest…" : <>Request beta access <ArrowUpRight size={17} /></>}</button>
               <p className="form-note"><LockKeyhole size={13} />Your interest is private. We will only use this email to follow up about the beta.</p>
+              {formMessage && <p className="form-message" role="status" aria-live="polite">{formMessage}</p>}
             </form>
           </div>
         </section>
