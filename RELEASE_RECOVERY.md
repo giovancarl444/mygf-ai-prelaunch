@@ -19,3 +19,7 @@ Use the checkpoint for managed-project rollback and the Git recovery branch or r
 ## Zero-Overlay Redesign Baseline
 
 Before the consumer-first zero-overlay redesign, the existing six-companion media experience was preserved in project checkpoint **`d02a6b36`**. This is the immediate rollback target for the current redesign work. To return to the prior companion-media presentation, restore checkpoint `d02a6b36` through project version history; it retains the managed portrait mappings, fictional adult labels, beta-interest behavior, and all earlier recovery references.
+
+## Final Zero-Overlay Consumer Redesign
+
+The completed zero-overlay consumer redesign is preserved in project checkpoint **`5c1bae97`**. It presents all six companion portraits as unobstructed image-only frames, moves profile metadata and calls to action into separate colorful dossiers, and retains the beta-interest flow and product boundaries. To undo this redesign while keeping the earlier portrait integration, restore checkpoint **`d02a6b36`**. To return to the original pre-media implementation, restore checkpoint **`b59f336e`**.

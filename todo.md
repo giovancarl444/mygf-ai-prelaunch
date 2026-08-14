@@ -35,4 +35,4 @@
 - [x] Rebuild the discovery catalog into a colorful, varied, consumer-first world-browsing composition.
 - [x] Recompose the hero, process, beta, FAQ, and editorial sections away from a corporate product-deck feel.
 - [x] Verify all six companion media frames, responsive rendering, beta-interest behavior, tests, production build, and runtime logs.
-- [ ] Save the zero-overlay consumer redesign as a final recovery checkpoint and record rollback references.
+- [x] Save the zero-overlay consumer redesign as a final recovery checkpoint and record rollback references.
