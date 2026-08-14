@@ -37,6 +37,19 @@ export function providerFailure(error: unknown): never {
   throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The companion service is temporarily unavailable." });
 }
 
+/**
+ * Whether a failed attempt should be returned to the account's allowance.
+ *
+ * Infrastructure failures are refunded because the customer did nothing wrong
+ * and received nothing. A moderation rejection (400) is not refunded, so a
+ * rejected prompt still costs an attempt and cannot be retried without bound.
+ */
+export function isRefundableProviderFailure(error: unknown) {
+  if (!(error instanceof OhApiError)) return false;
+  if (error.status === undefined) return true; // network / unreachable
+  return error.status >= 500;
+}
+
 /** Collapses a failure into an allowlisted audit classification. */
 export function providerFailureClass(error: unknown) {
   if (error instanceof OhApiError) return error.status ? `provider_${error.status}` : "provider_network";

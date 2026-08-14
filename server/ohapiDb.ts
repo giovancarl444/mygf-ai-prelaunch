@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import {
   ohapiAdminAudits,
   ohapiCharacters,
@@ -26,7 +26,7 @@ export function slugifyCompanionName(name: string, providerCharacterId: string) 
   const base = name
     .toLowerCase()
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
@@ -85,14 +85,31 @@ export type SyncCharacterInput = {
   providerType: "ORIGINAL" | "DIGITAL_TWIN" | null;
 };
 
+export class EmptyProviderLibraryError extends Error {
+  constructor() {
+    super("The provider returned no characters. Nothing was changed.");
+    this.name = "EmptyProviderLibraryError";
+  }
+}
+
 /**
  * Reconciles the local registry against the provider library.
  *
  * Keyed on `providerCharacterId` rather than `worldSlug`, because the provider
  * id is the durable identity. Matching on the slug is what allowed an existing
  * row to be silently repointed when two worlds resolved to one provider record.
+ *
+ * Presence and visibility are deliberately separate axes: `status` tracks
+ * whether the provider still has the character, `visibility` records the
+ * owner's publishing decision. Retiring only touches `status`, so a companion
+ * that disappears and later returns comes back with the owner's choice intact.
  */
 export async function syncOhapiCharacters(characters: readonly SyncCharacterInput[]) {
+  // An empty library is far more likely to be a transient provider failure than
+  // a deliberate removal of every companion, and acting on it would retire the
+  // entire public catalog. Refuse rather than guess.
+  if (characters.length === 0) throw new EmptyProviderLibraryError();
+
   const db = await requireDb();
   const now = new Date();
   let created = 0;
@@ -141,17 +158,17 @@ export async function syncOhapiCharacters(characters: readonly SyncCharacterInpu
   }
 
   // Anything no longer present in the provider library must stop being offered.
+  // `visibility` is left alone so the owner's publish/hide choice survives a
+  // disappear-and-return cycle.
   const liveIds = characters.map(character => character.providerCharacterId);
-  const stale = liveIds.length
-    ? await db.select().from(ohapiCharacters).where(and(
-        eq(ohapiCharacters.status, "approved"),
-        sql`${ohapiCharacters.providerCharacterId} NOT IN (${sql.join(liveIds.map(id => sql`${id}`), sql`, `)})`,
-      ))
-    : await db.select().from(ohapiCharacters).where(eq(ohapiCharacters.status, "approved"));
+  const stale = await db.select({ id: ohapiCharacters.id }).from(ohapiCharacters).where(and(
+    eq(ohapiCharacters.status, "approved"),
+    notInArray(ohapiCharacters.providerCharacterId, liveIds),
+  ));
 
   if (stale.length) {
     await db.update(ohapiCharacters)
-      .set({ status: "disabled", visibility: "hidden" })
+      .set({ status: "disabled" })
       .where(inArray(ohapiCharacters.id, stale.map(row => row.id)));
   }
 
@@ -286,12 +303,25 @@ export async function renameOwnedOhapiRoom(input: { userId: number; roomId: numb
   return getOwnedOhapiRoomById({ userId: input.userId, roomId: room.id });
 }
 
+/**
+ * Retires a conversation and removes what MyGF.ai stored for it.
+ *
+ * Generation records for the same companion are removed too. The product tells
+ * the customer that clearing removes the conversation, and leaving their
+ * prompts behind under a different table would make that untrue. Reports are
+ * retained deliberately — they exist for safety review — but are unlinked from
+ * the deleted messages first.
+ */
 export async function clearOwnedOhapiRoom(input: { userId: number; roomId: number }) {
   const db = await requireDb();
   const room = await getOwnedOhapiRoomById(input);
   if (!room) return false;
+
   await db.update(ohapiReports).set({ messageId: null }).where(eq(ohapiReports.roomId, room.id));
-  await db.update(ohapiMediaJobs).set({ roomId: null }).where(eq(ohapiMediaJobs.roomId, room.id));
+  await db.delete(ohapiMediaJobs).where(and(
+    eq(ohapiMediaJobs.userId, input.userId),
+    eq(ohapiMediaJobs.ohapiCharacterId, room.ohapiCharacterId),
+  ));
   await db.delete(ohapiMessages).where(eq(ohapiMessages.roomId, room.id));
   await db.update(ohapiRooms).set({ deletedAt: new Date(), title: null }).where(eq(ohapiRooms.id, room.id));
   return true;
@@ -397,9 +427,20 @@ export async function updateOhapiMediaJob(input: {
   }).where(eq(ohapiMediaJobs.id, input.id));
 }
 
-export async function listOwnedOhapiMediaJobs(input: { userId: number; ohapiCharacterId?: number }) {
+/**
+ * Provider result URLs are presigned and short-lived, and MyGF.ai does not
+ * re-host the asset. Anything older than this window would render as a broken
+ * image, so the gallery is bounded to results that are plausibly still fetchable.
+ */
+export const MEDIA_RESULT_FRESH_MS = 30 * 60 * 1000;
+
+export async function listOwnedOhapiMediaJobs(input: { userId: number; ohapiCharacterId?: number; now?: Date }) {
   const db = await requireDb();
-  const filters = [eq(ohapiMediaJobs.userId, input.userId)];
+  const since = new Date((input.now ?? new Date()).getTime() - MEDIA_RESULT_FRESH_MS);
+  const filters = [
+    eq(ohapiMediaJobs.userId, input.userId),
+    sql`${ohapiMediaJobs.createdAt} >= ${since}`,
+  ];
   if (typeof input.ohapiCharacterId === "number") {
     filters.push(eq(ohapiMediaJobs.ohapiCharacterId, input.ohapiCharacterId));
   }
@@ -422,11 +463,6 @@ export function describeOhapiAllowance(used: number, limit: number, now = new Da
   const resetAt = new Date(now);
   resetAt.setUTCHours(resetAt.getUTCHours() + 1, 0, 0, 0);
   return { allowed: used <= limit, used, limit, remaining: Math.max(0, limit - used), resetAt };
-}
-
-/** Back-compat alias retained for the existing deterministic allowance tests. */
-export function describeOhapiTextAllowance(used: number, now = new Date()) {
-  return describeOhapiAllowance(used, HOURLY_TEXT_LIMIT, now);
 }
 
 function bucketKeyFor(scope: RateScope, now: Date) {

@@ -3,13 +3,13 @@ import { z } from "zod";
 import { router } from "./_core/trpc";
 import { adultProcedure } from "./ohapiAccess";
 import {
+  classifyOhApiJob,
   getOhApiJobStatus,
-  isFailedOhApiJobStatus,
   requestOhApiAudio,
   requestOhApiImage,
   requestOhApiVideo,
 } from "./ohapi";
-import { providerFailure } from "./ohapiErrors";
+import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import {
   consumeOhapiAllowance,
   createOhapiMediaJob,
@@ -56,24 +56,25 @@ async function submitMediaJob<T extends { jobId: string; presignedUrl: string | 
   try {
     submission = await input.submit();
   } catch (error) {
-    await refundOhapiAllowance(input.userId, "media");
+    if (isRefundableProviderFailure(error)) await refundOhapiAllowance(input.userId, "media");
     return providerFailure(error);
   }
 
+  // The submission's presigned URL points at an object that does not exist yet,
+  // so it is deliberately not stored or returned. The result URL is recorded
+  // only when the job reports completion.
   await createOhapiMediaJob({
     userId: input.userId,
     ohapiCharacterId: input.ohapiCharacterId ?? null,
     providerJobId: submission.jobId,
     kind: input.kind,
     prompt: input.prompt,
-    resultUrl: submission.presignedUrl,
   });
 
   return {
     jobId: submission.jobId,
     kind: input.kind,
     status: "pending" as const,
-    resultUrl: submission.presignedUrl,
     remaining: allowance.remaining,
   };
 }
@@ -95,7 +96,9 @@ export const ohapiMediaRouter = router({
 
   video: adultProcedure.input(z.object({
     worldSlug: worldSlugSchema.optional(),
-    imageUrl: z.string().url().max(2_048).optional(),
+    imageUrl: z.string().url().max(2_048)
+      .refine(value => value.startsWith("https://"), { message: "Source images must be served over HTTPS." })
+      .optional(),
     prompt: promptSchema,
     promptEnhancement: z.boolean().optional(),
   }).refine(value => Boolean(value.worldSlug) !== Boolean(value.imageUrl), {
@@ -148,9 +151,7 @@ export const ohapiMediaRouter = router({
       return providerFailure(error);
     }
 
-    const completed = state.presignedUrl !== null && !isFailedOhApiJobStatus(state.status);
-    const failed = isFailedOhApiJobStatus(state.status);
-    const nextStatus = failed ? "failed" : completed ? "completed" : "pending";
+    const nextStatus = classifyOhApiJob(state);
 
     if (nextStatus !== "pending") {
       await updateOhapiMediaJob({
@@ -158,7 +159,7 @@ export const ohapiMediaRouter = router({
         status: nextStatus,
         resultUrl: state.presignedUrl,
         // The provider's failure text is not surfaced to the customer.
-        errorMessage: failed ? "generation_failed" : null,
+        errorMessage: nextStatus === "failed" ? "generation_failed" : null,
       });
     }
 
@@ -166,8 +167,11 @@ export const ohapiMediaRouter = router({
       jobId: input.jobId,
       kind: job.kind,
       status: nextStatus,
-      resultUrl: state.presignedUrl ?? job.resultUrl,
-      errorMessage: failed ? "That generation could not be completed. Please try a different prompt." : null,
+      // Only hand back a URL once the job is genuinely finished. The submission
+      // response carries a presigned URL up front, and serving that early would
+      // show the customer an empty or partial asset.
+      resultUrl: nextStatus === "completed" ? state.presignedUrl : null,
+      errorMessage: nextStatus === "failed" ? "That generation could not be completed. Please try a different prompt." : null,
     };
   }),
 

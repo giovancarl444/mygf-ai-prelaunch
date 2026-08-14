@@ -139,3 +139,38 @@ history. `OHAPI_INTEGRATION.md` and `PRODUCT_MODEL.md` replace them.
 branches, and `release/published-20260814` were verified present on that remote.
 The historical entries are left unedited; whether this reflects a rename or a
 mistaken record needs owner confirmation.
+
+## Hardening Pass
+
+Follow-up to the rebuild, correcting defects found by reviewing that commit.
+
+- `syncOhapiCharacters` refused to reconcile against an empty provider library.
+  Previously a transient empty response retired every companion **and** forced
+  `visibility` to hidden, which a later good sync did not undo — one bad response
+  would have taken the catalog down until each companion was re-published by hand.
+  Presence (`status`) and the owner's publishing choice (`visibility`) are now
+  separate axes, so a disappear-and-return cycle preserves curation.
+- Media completion is decided by job `status`, never by the presence of a
+  presigned URL. The submission response returns a URL before any work is done,
+  so the previous check reported every generation as finished the moment it was
+  queued. That URL is no longer stored or returned at submission time.
+- The public catalog degrades to an empty list if storage is unavailable, instead
+  of failing the anonymous landing page.
+- `/manus-storage/*` was removed. It vended presigned URLs for any requested key
+  with no authentication, and nothing referenced it once portraits began coming
+  from provider URLs. `server/storage.ts` and `server/_core/imageGeneration.ts`
+  were removed with it — both were unused and were its only dependents.
+- Clearing a conversation now deletes the generation records for that companion.
+  They previously survived, which contradicted what the product told the customer.
+- The in-chat gallery is bounded to results from the last 30 minutes, because
+  provider URLs are short-lived and MyGF.ai does not re-host the asset. Durable
+  media storage is the next phase's first task.
+- Reporting has a real UI, and the generation panel is reachable on mobile
+  through an overlay rather than being hidden below 1180px.
+- Allowances are refunded on infrastructure failures (5xx and network) but not on
+  moderation rejections, so a rejected prompt still costs an attempt.
+- Video `image_url` inputs must be HTTPS.
+- Removed dead code: `drizzle/relations.ts`, `client/src/pages/ComponentShowcase.tsx`.
+
+Verified: `tsc` clean, 35 tests passing with one intentional live-network probe
+skipped, client and server builds succeed.

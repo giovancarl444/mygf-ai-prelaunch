@@ -3,7 +3,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { adultProcedure } from "./ohapiAccess";
 import { createOhApiRoom, generateOhApiText } from "./ohapi";
-import { providerFailure } from "./ohapiErrors";
+import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import {
   clearOwnedOhapiRoom,
   consumeOhapiAllowance,
@@ -152,6 +152,7 @@ export const ohapiChatRouter = router({
       await touchOhapiRoom(room.id);
       return { content, remaining: allowance.remaining, resetAt: allowance.resetAt };
     } catch (error) {
+      if (isRefundableProviderFailure(error)) await refundOhapiAllowance(ctx.user.id, "text");
       return providerFailure(error);
     }
   }),

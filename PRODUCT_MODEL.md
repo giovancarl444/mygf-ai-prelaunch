@@ -56,8 +56,9 @@ Consequences worth knowing:
 
 - Talk, with the thread persisted and account-owned.
 - Ask for a photo, a voice note, or a short video, generated in her likeness.
-- Rename and clear a thread. Clearing removes the local transcript and retires the
-  room; it does not claim to erase provider-retained records, and the product says so.
+- Rename and clear a thread. Clearing removes the stored transcript **and the
+  generation records for that companion**, then retires the room. It does not
+  claim to erase provider-retained records, and the product says so.
 - Report a conversation for safety or quality review.
 
 ## Limits
@@ -73,6 +74,11 @@ rejection.
   webhook receiver and a separate safety design before it belongs in the product.
 - **Public media galleries.** Generated media is private to the account that
   requested it. There is no shared or public feed.
+- **Durable media storage.** Provider results are short-lived presigned URLs and
+  MyGF.ai does not re-host them, so the in-chat gallery only shows results from
+  the last 30 minutes. Persisting media needs an object store and a retention and
+  deletion policy — it is the first thing to build in the next phase, not a
+  detail to bolt on.
 - **Reviews, ratings, testimonials.** None exist, and none should be fabricated.
 
 ## Owner operations

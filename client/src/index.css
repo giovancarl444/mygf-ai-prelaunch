@@ -1092,6 +1092,83 @@ p {
 }
 
 /* ========================================================================== */
+/* Chat auxiliaries                                                           */
+/* ========================================================================== */
+
+.chat-subtitle { margin: 0; color: var(--text-dim); font-size: 11.5px; }
+
+.chat-head-actions { display: flex; gap: 6px; margin-left: auto; }
+.chat-head-actions .ghost-button { padding: 7px 10px; }
+
+.chat-empty { margin: auto; border: 0; background: transparent; }
+
+.thread-empty { padding: 14px; color: var(--text-dim); font-size: 13px; line-height: 1.55; }
+.thread-item-icon { display: grid; place-items: center; color: var(--accent-soft); }
+
+.chat-report {
+  display: grid;
+  gap: 10px;
+  margin: 0 16px 12px;
+  padding: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+}
+
+.chat-report-row { display: flex; gap: 10px; align-items: center; }
+.chat-report label { color: var(--text-muted); font-size: 12px; font-weight: 700; }
+
+.chat-report select,
+.chat-report textarea {
+  padding: 9px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.chat-report textarea { min-height: 72px; resize: vertical; }
+
+.media-toggle,
+.media-close { display: none; }
+
+.media-close {
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.media-submit { width: 100%; }
+.media-inline-error { margin: 0 0 12px; }
+
+.media-gallery-title {
+  margin: 18px 0 8px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.media-gallery-icon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--surface-2);
+  color: var(--accent-soft);
+}
+
+.media-scrim { display: none; }
+
+/* ========================================================================== */
 /* Gate / interstitial                                                        */
 /* ========================================================================== */
 
@@ -1220,8 +1297,44 @@ p {
     grid-template-columns: 220px minmax(0, 1fr);
   }
 
-  .chat-layout .media-panel {
-    display: none;
+  /* Generation moves into an overlay rather than disappearing. Photos, voice,
+     and video are the product — they cannot be desktop-only. */
+  .media-panel {
+    position: fixed;
+    top: 68px;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    width: min(392px, 100%);
+    border-radius: 0;
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: transform 0.22s var(--ease), visibility 0.22s var(--ease);
+  }
+
+  .media-panel.open {
+    transform: translateX(0);
+    visibility: visible;
+    box-shadow: -18px 0 50px rgba(0, 0, 0, 0.5);
+  }
+
+  .media-toggle,
+  .media-close {
+    display: inline-flex;
+  }
+
+  .media-scrim {
+    position: fixed;
+    inset: 68px 0 0;
+    z-index: 55;
+    border: 0;
+    background: rgba(5, 4, 8, 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-panel {
+    transition: none;
   }
 }
 

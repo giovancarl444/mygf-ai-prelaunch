@@ -42,14 +42,30 @@ export function toPublicCompanion(row: {
 }
 
 export const ohapiCompanionsRouter = router({
-  /** Public catalog. Every entry here is a companion that can actually be opened. */
+  /**
+   * Public catalog. Every entry here is a companion that can actually be opened.
+   *
+   * A storage failure degrades to an empty catalog rather than a broken page:
+   * these are the first queries an anonymous visitor makes, so they must not be
+   * able to take the marketing site down.
+   */
   list: publicProcedure.query(async () => {
-    const rows = await listPublishedOhapiCharacters();
-    return rows.map(toPublicCompanion);
+    try {
+      const rows = await listPublishedOhapiCharacters();
+      return rows.map(toPublicCompanion);
+    } catch (error) {
+      console.error("[Companions] Catalog unavailable:", error);
+      return [] as PublicCompanion[];
+    }
   }),
 
   bySlug: publicProcedure.input(z.object({ worldSlug: worldSlugSchema })).query(async ({ input }) => {
-    const row = await getPublishedOhapiCharacterBySlug(input.worldSlug);
-    return row ? toPublicCompanion(row) : null;
+    try {
+      const row = await getPublishedOhapiCharacterBySlug(input.worldSlug);
+      return row ? toPublicCompanion(row) : null;
+    } catch (error) {
+      console.error("[Companions] Profile unavailable:", error);
+      return null;
+    }
   }),
 });

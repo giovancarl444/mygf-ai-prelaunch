@@ -253,12 +253,29 @@ export async function getOhApiJobStatus(jobId: string): Promise<OhApiJobState> {
   };
 }
 
-export function isTerminalOhApiJobStatus(status: string) {
-  return status === "completed" || status === "complete" || status === "succeeded" || status === "failed" || status === "error";
+const COMPLETED_JOB_STATUSES = new Set(["completed", "complete", "succeeded", "success", "done", "finished"]);
+const FAILED_JOB_STATUSES = new Set(["failed", "error", "errored", "cancelled", "canceled", "rejected"]);
+
+export function isCompletedOhApiJobStatus(status: string) {
+  return COMPLETED_JOB_STATUSES.has(status);
 }
 
 export function isFailedOhApiJobStatus(status: string) {
-  return status === "failed" || status === "error";
+  return FAILED_JOB_STATUSES.has(status);
+}
+
+/**
+ * Classifies a polled job.
+ *
+ * Completion is decided by `status`, never by the presence of a presigned URL.
+ * The submission response already returns a `presigned_url` before any work is
+ * done, so treating a URL as proof of completion would report every job as
+ * finished the moment it was queued.
+ */
+export function classifyOhApiJob(state: OhApiJobState): "completed" | "failed" | "pending" {
+  if (isFailedOhApiJobStatus(state.status)) return "failed";
+  if (isCompletedOhApiJobStatus(state.status)) return state.presignedUrl ? "completed" : "pending";
+  return "pending";
 }
 
 /* -------------------------------------------------------------------------- */

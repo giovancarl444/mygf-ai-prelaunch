@@ -3,7 +3,6 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import {
-  ArrowLeft,
   CircleAlert,
   Download,
   Flag,
@@ -17,12 +16,15 @@ import {
   Trash2,
   UserRound,
   Video,
+  Wand2,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 
 type MediaTab = "image" | "audio" | "video";
 type ActiveJob = { jobId: string; kind: MediaTab; startedAt: number };
+type ReportReason = "safety" | "quality" | "other";
 
 const JOB_TIMEOUT_MS = 5 * 60 * 1000;
 const JOB_POLL_MS = 2_000;
@@ -36,10 +38,15 @@ export default function Chat() {
   const utils = trpc.useUtils();
 
   const session = trpc.chat.session.useQuery(undefined, { enabled: isAuthenticated });
+  const adultConfirmed = Boolean(session.data?.adultConfirmed);
   const companion = trpc.companions.bySlug.useQuery({ worldSlug: slug }, { enabled: Boolean(slug) });
   const history = trpc.chat.history.useQuery(
     { worldSlug: slug },
-    { enabled: isAuthenticated && Boolean(slug) && Boolean(session.data?.adultConfirmed) },
+    { enabled: isAuthenticated && Boolean(slug) && adultConfirmed },
+  );
+  const gallery = trpc.media.gallery.useQuery(
+    { worldSlug: slug },
+    { enabled: isAuthenticated && Boolean(slug) && adultConfirmed },
   );
 
   const [draft, setDraft] = useState("");
@@ -47,9 +54,14 @@ export default function Chat() {
   const [adultChecked, setAdultChecked] = useState(false);
   const [mediaTab, setMediaTab] = useState<MediaTab>("image");
   const [mediaPrompt, setMediaPrompt] = useState("");
+  const [mediaOpen, setMediaOpen] = useState(false);
   const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
   const [clearArmed, setClearArmed] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<ReportReason>("quality");
+  const [reportDetail, setReportDetail] = useState("");
+  const [reportSent, setReportSent] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const confirmAdult = trpc.chat.confirmAdult.useMutation({
@@ -67,7 +79,19 @@ export default function Chat() {
   const clearThread = trpc.chat.clearThread.useMutation({
     onSuccess: async () => {
       setClearArmed(false);
-      await Promise.all([utils.chat.history.invalidate(), utils.chat.session.invalidate()]);
+      await Promise.all([
+        utils.chat.history.invalidate(),
+        utils.chat.session.invalidate(),
+        utils.media.gallery.invalidate(),
+      ]);
+    },
+  });
+
+  const report = trpc.chat.report.useMutation({
+    onSuccess: () => {
+      setReportSent(true);
+      setReportOpen(false);
+      setReportDetail("");
     },
   });
 
@@ -110,20 +134,34 @@ export default function Chat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, send.isPending]);
 
+  // Everything on this screen is scoped to one companion, so switching away must
+  // not leave the previous conversation's generation or report state on screen.
+  useEffect(() => {
+    setActiveJob(null);
+    setJobError(null);
+    setMediaPrompt("");
+    setDraft("");
+    setPendingMessage(null);
+    setClearArmed(false);
+    setReportOpen(false);
+    setReportSent(false);
+  }, [slug]);
+
   // Stop polling a job that has outlived the documented five-minute ceiling.
   useEffect(() => {
     if (!activeJob) return;
     const remaining = JOB_TIMEOUT_MS - (Date.now() - activeJob.startedAt);
-    if (remaining <= 0) return;
     const timer = window.setTimeout(() => {
-      setActiveJob(current => {
-        if (current?.jobId !== activeJob.jobId) return current;
-        setJobError("That generation is taking longer than expected. Check back shortly.");
-        return null;
-      });
-    }, remaining);
+      setJobError("That generation is taking longer than expected. It may still finish — check the gallery shortly.");
+      setActiveJob(null);
+    }, Math.max(remaining, 0));
     return () => window.clearTimeout(timer);
   }, [activeJob]);
+
+  const completedJobId = jobStatus.data?.status === "completed" ? jobStatus.data.jobId : null;
+  useEffect(() => {
+    if (completedJobId) void utils.media.gallery.invalidate();
+  }, [completedJobId, utils]);
 
   const mediaBusy = imageJob.isPending || audioJob.isPending || videoJob.isPending
     || (Boolean(activeJob) && jobStatus.data?.status === "pending");
@@ -179,7 +217,7 @@ export default function Chat() {
     );
   }
 
-  if (session.data && !session.data.adultConfirmed) {
+  if (session.data && !adultConfirmed) {
     return (
       <div className="app-shell">
         <AppHeader />
@@ -225,6 +263,7 @@ export default function Chat() {
 
   const threads = session.data?.threads ?? [];
   const her = companion.data;
+  const firstName = her?.displayName.split(" ")[0] ?? "her";
 
   return (
     <div className="app-shell">
@@ -232,9 +271,7 @@ export default function Chat() {
 
       <div className="chat-layout">
         <aside className="chat-panel thread-panel">
-          <div className="chat-panel-head">
-            <h2>Your chats</h2>
-          </div>
+          <div className="chat-panel-head"><h2>Your chats</h2></div>
           <div className="thread-list">
             {threads.length ? threads.map(thread => (
               <button
@@ -248,19 +285,13 @@ export default function Chat() {
                     ? <img src={thread.profileImageUrl} alt="" />
                     : <span className="companion-portrait-fallback"><UserRound size={15} /></span>}
                 </span>
-                <span style={{ minWidth: 0 }}>
-                  <strong>{thread.displayName}</strong>
-                </span>
+                <span style={{ minWidth: 0 }}><strong>{thread.displayName}</strong></span>
               </button>
             )) : (
-              <p style={{ padding: 14, color: "var(--text-dim)", fontSize: 13, lineHeight: 1.55 }}>
-                No conversations yet. Open a companion to start one.
-              </p>
+              <p className="thread-empty">No conversations yet. Open a companion to start one.</p>
             )}
             <Link href="/companions" className="thread-item">
-              <span className="chat-avatar" style={{ display: "grid", placeItems: "center" }}>
-                <Sparkles size={15} />
-              </span>
+              <span className="chat-avatar thread-item-icon"><Sparkles size={15} /></span>
               <strong>Find someone new</strong>
             </Link>
           </div>
@@ -268,7 +299,7 @@ export default function Chat() {
 
         <section className="chat-panel">
           {!slug ? (
-            <div className="empty-state" style={{ border: 0, margin: "auto" }}>
+            <div className="empty-state chat-empty">
               <Sparkles size={26} />
               <h3>Pick someone to talk to</h3>
               <p>Choose a conversation on the left, or browse the companions.</p>
@@ -277,7 +308,7 @@ export default function Chat() {
           ) : companion.isLoading ? (
             <div className="page-loading"><Loader2 className="animate-spin" size={20} /> Loading…</div>
           ) : !her ? (
-            <div className="empty-state" style={{ border: 0, margin: "auto" }}>
+            <div className="empty-state chat-empty">
               <UserRound size={26} />
               <h3>She is not available</h3>
               <p>This companion is not published right now.</p>
@@ -293,32 +324,102 @@ export default function Chat() {
                 </Link>
                 <div style={{ minWidth: 0 }}>
                   <h2>{her.displayName}</h2>
-                  <p style={{ margin: 0, color: "var(--text-dim)", fontSize: 11.5 }}>
-                    AI companion{her.occupation ? ` · ${her.occupation}` : ""}
-                  </p>
+                  <p className="chat-subtitle">AI companion{her.occupation ? ` · ${her.occupation}` : ""}</p>
                 </div>
-                <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                <div className="chat-head-actions">
+                  <button
+                    type="button"
+                    className="ghost-button media-toggle"
+                    onClick={() => setMediaOpen(true)}
+                    aria-label="Open generation panel"
+                  >
+                    <Wand2 size={15} />
+                  </button>
                   {history.data?.room && (
-                    clearArmed ? (
-                      <>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          onClick={() => clearThread.mutate({ roomId: history.data!.room!.id })}
-                          disabled={clearThread.isPending}
-                        >
-                          Confirm clear
-                        </button>
-                        <button type="button" className="ghost-button" onClick={() => setClearArmed(false)}>Cancel</button>
-                      </>
-                    ) : (
-                      <button type="button" className="ghost-button" onClick={() => setClearArmed(true)} aria-label="Clear conversation">
-                        <Trash2 size={15} />
+                    <>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => { setReportOpen(open => !open); setReportSent(false); }}
+                        aria-label="Report this conversation"
+                      >
+                        <Flag size={15} />
                       </button>
-                    )
+                      {clearArmed ? (
+                        <>
+                          <button
+                            type="button"
+                            className="ghost-button"
+                            onClick={() => clearThread.mutate({ roomId: history.data!.room!.id })}
+                            disabled={clearThread.isPending}
+                          >
+                            Confirm
+                          </button>
+                          <button type="button" className="ghost-button" onClick={() => setClearArmed(false)}>Cancel</button>
+                        </>
+                      ) : (
+                        <button type="button" className="ghost-button" onClick={() => setClearArmed(true)} aria-label="Clear conversation">
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
+
+              {clearArmed && (
+                <p className="chat-notice">
+                  <CircleAlert size={14} />
+                  Clearing removes this transcript from MyGF.ai. Provider-side retention is separate.
+                </p>
+              )}
+
+              {reportSent && (
+                <p className="chat-notice">
+                  <ShieldCheck size={14} />
+                  Report sent. Thank you — it goes to private review.
+                </p>
+              )}
+
+              {reportOpen && history.data?.room && (
+                <form
+                  className="chat-report"
+                  onSubmit={event => {
+                    event.preventDefault();
+                    report.mutate({
+                      roomId: history.data!.room!.id,
+                      reason: reportReason,
+                      detail: reportDetail.trim() || undefined,
+                    });
+                  }}
+                >
+                  <div className="chat-report-row">
+                    <label htmlFor="report-reason">Reason</label>
+                    <select
+                      id="report-reason"
+                      value={reportReason}
+                      onChange={event => setReportReason(event.target.value as ReportReason)}
+                    >
+                      <option value="safety">Safety concern</option>
+                      <option value="quality">Quality issue</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <textarea
+                    value={reportDetail}
+                    maxLength={800}
+                    onChange={event => setReportDetail(event.target.value)}
+                    placeholder="Optional: what happened?"
+                  />
+                  <div className="chat-report-row">
+                    <button type="submit" className="primary-button" disabled={report.isPending}>
+                      {report.isPending ? "Sending…" : "Send report"}
+                    </button>
+                    <button type="button" className="ghost-button" onClick={() => setReportOpen(false)}>Cancel</button>
+                  </div>
+                  {report.error && <p className="chat-error"><CircleAlert size={15} />{report.error.message}</p>}
+                </form>
+              )}
 
               {session.data && session.data.messagesRemaining <= 5 && (
                 <p className="chat-notice">
@@ -330,19 +431,15 @@ export default function Chat() {
               <div className="message-scroll" ref={scrollRef}>
                 <div className="message-list">
                   {messages.length === 0 && !history.isLoading && (
-                    <div className="message assistant">
-                      Say something to {her.displayName.split(" ")[0]} to start the conversation.
-                    </div>
+                    <div className="message assistant">Say something to {firstName} to start the conversation.</div>
                   )}
                   {messages.map(message => (
-                    <div key={message.id} className={`message ${message.role}`}>
-                      {message.content}
-                    </div>
+                    <div key={message.id} className={`message ${message.role}`}>{message.content}</div>
                   ))}
                   {send.isPending && (
                     <p className="message-typing">
                       <Loader2 className="animate-spin" size={14} />
-                      {her.displayName.split(" ")[0]} is typing…
+                      {firstName} is typing…
                     </p>
                   )}
                 </div>
@@ -365,7 +462,7 @@ export default function Chat() {
                       handleSend();
                     }
                   }}
-                  placeholder={`Message ${her.displayName.split(" ")[0]}…`}
+                  placeholder={`Message ${firstName}…`}
                   rows={1}
                   aria-label="Your message"
                 />
@@ -383,7 +480,7 @@ export default function Chat() {
           )}
         </section>
 
-        <aside className="chat-panel media-panel">
+        <aside className={mediaOpen ? "chat-panel media-panel open" : "chat-panel media-panel"}>
           <div className="media-tabs" role="tablist">
             {([
               { id: "image" as const, label: "Photo", icon: ImageIcon },
@@ -401,6 +498,14 @@ export default function Chat() {
                 {tab.label}
               </button>
             ))}
+            <button
+              type="button"
+              className="media-close"
+              onClick={() => setMediaOpen(false)}
+              aria-label="Close generation panel"
+            >
+              <X size={16} />
+            </button>
           </div>
 
           <div className="media-body">
@@ -425,8 +530,7 @@ export default function Chat() {
                 />
                 <button
                   type="button"
-                  className="primary-button"
-                  style={{ width: "100%" }}
+                  className="primary-button media-submit"
                   onClick={submitMedia}
                   disabled={!mediaPrompt.trim() || mediaBusy}
                 >
@@ -434,11 +538,12 @@ export default function Chat() {
                   {mediaBusy ? "Generating…" : `Generate ${mediaTab === "image" ? "photo" : mediaTab === "audio" ? "voice note" : "video"}`}
                 </button>
                 <p className="media-hint">
-                  Generation runs in the background and can take up to a few minutes.
+                  Generation runs in the background and can take a few minutes.
+                  {session.data ? ` ${session.data.messagesRemaining} messages left this hour.` : ""}
                 </p>
 
                 {jobError && (
-                  <p className="chat-error" style={{ margin: "0 0 12px" }}>
+                  <p className="chat-error media-inline-error">
                     <CircleAlert size={15} />
                     {jobError}
                   </p>
@@ -452,7 +557,7 @@ export default function Chat() {
                 )}
 
                 {jobStatus.data?.status === "failed" && (
-                  <p className="chat-error" style={{ margin: "0 0 12px" }}>
+                  <p className="chat-error media-inline-error">
                     <CircleAlert size={15} />
                     {jobStatus.data.errorMessage ?? "That generation could not be completed."}
                   </p>
@@ -465,32 +570,37 @@ export default function Chat() {
                     {jobStatus.data.kind === "audio" && <audio controls src={jobStatus.data.resultUrl} />}
                     <div className="media-result-foot">
                       <span>Ready</span>
-                      <a
-                        href={jobStatus.data.resultUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="companion-cta"
-                      >
+                      <a href={jobStatus.data.resultUrl} target="_blank" rel="noreferrer" className="companion-cta">
                         <Download size={13} /> Open
                       </a>
                     </div>
                   </div>
                 )}
 
-                {history.data?.room && (
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    style={{ width: "100%", marginTop: 14 }}
-                    onClick={() => navigate(`/companion/${her.worldSlug}`)}
-                  >
-                    <Flag size={14} /> About {her.displayName.split(" ")[0]}
-                  </button>
+                {gallery.data && gallery.data.length > 0 && (
+                  <>
+                    <p className="media-gallery-title">Recent with {firstName}</p>
+                    <div className="media-gallery">
+                      {gallery.data.slice(0, 12).map(item => (
+                        <a key={item.jobId} href={item.resultUrl ?? "#"} target="_blank" rel="noreferrer" title={item.prompt ?? undefined}>
+                          {item.kind === "image" && item.resultUrl
+                            ? <img src={item.resultUrl} alt={item.prompt ?? "Earlier generation"} loading="lazy" />
+                            : <span className="media-gallery-icon">{item.kind === "video" ? <Video size={18} /> : <Mic size={18} />}</span>}
+                        </a>
+                      ))}
+                    </div>
+                    <p className="media-hint">
+                      Results are hosted by the provider on short-lived links and are not
+                      stored by MyGF.ai. Download anything you want to keep.
+                    </p>
+                  </>
                 )}
               </>
             )}
           </div>
         </aside>
+
+        {mediaOpen && <button type="button" className="media-scrim" onClick={() => setMediaOpen(false)} aria-label="Close generation panel" />}
       </div>
     </div>
   );

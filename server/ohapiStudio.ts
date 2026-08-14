@@ -12,6 +12,7 @@ import {
 import { providerFailure, providerFailureClass } from "./ohapiErrors";
 import {
   createOhapiAdminAudit,
+  EmptyProviderLibraryError,
   getOhapiStudioSummary,
   listAllOhapiCharacters,
   listRecentOhapiAdminAudits,
@@ -123,6 +124,12 @@ export const ohapiStudioRouter = router({
         outcome: "failed",
         detail: providerFailureClass(error),
       });
+      if (error instanceof EmptyProviderLibraryError) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "The provider returned no characters, so the catalog was left untouched. Check the account and try again.",
+        });
+      }
       if (error instanceof TRPCError) throw error;
       return providerFailure(error);
     }
