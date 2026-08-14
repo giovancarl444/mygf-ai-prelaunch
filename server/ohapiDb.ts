@@ -505,6 +505,23 @@ export async function expireOldPendingOhapiMediaJobs(input: { userId: number; no
  */
 export const MEDIA_RESULT_FRESH_MS = 6 * 24 * 60 * 60 * 1000;
 
+/**
+ * The generations that belong to one conversation, oldest first.
+ *
+ * The room is the ownership boundary here: callers resolve it through
+ * `getOwnedOhapiRoom` first, so this does not re-check the account. Bounded to
+ * the window in which a result link can still resolve, for the same reason the
+ * gallery is.
+ */
+export async function listOhapiRoomMediaJobs(roomId: number, now = new Date()) {
+  const db = await requireDb();
+  const since = new Date(now.getTime() - MEDIA_RESULT_FRESH_MS);
+  return db.select().from(ohapiMediaJobs).where(and(
+    eq(ohapiMediaJobs.roomId, roomId),
+    sql`${ohapiMediaJobs.createdAt} >= ${since}`,
+  )).orderBy(asc(ohapiMediaJobs.createdAt)).limit(60);
+}
+
 export async function listOwnedOhapiMediaJobs(input: { userId: number; ohapiCharacterId?: number; now?: Date }) {
   const db = await requireDb();
   const since = new Date((input.now ?? new Date()).getTime() - MEDIA_RESULT_FRESH_MS);

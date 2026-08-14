@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   companion: { id: 11, providerCharacterId: "char-77", worldSlug: "ava-marchetti-4471", displayName: "Ava" } as Record<string, unknown> | undefined,
   existingRoom: undefined as Record<string, unknown> | undefined,
   allowanceUsed: 0,
+  mediaAllowanceUsed: 0,
   roomsThisHour: 0,
   liveRooms: 0,
 }));
@@ -14,10 +15,14 @@ const state = vi.hoisted(() => ({
 const provider = vi.hoisted(() => ({
   createRoom: vi.fn(),
   generateText: vi.fn(),
+  requestImage: vi.fn(),
+  requestVideo: vi.fn(),
+  requestAudio: vi.fn(),
 }));
 
 const store = vi.hoisted(() => ({
   createMessage: vi.fn(),
+  createMediaJob: vi.fn(),
   refund: vi.fn(),
   dedupe: vi.fn(),
 }));
@@ -28,6 +33,9 @@ vi.mock("./ohapi", async importOriginal => {
     ...original,
     createOhApiRoom: provider.createRoom,
     generateOhApiText: provider.generateText,
+    requestOhApiImage: provider.requestImage,
+    requestOhApiVideo: provider.requestVideo,
+    requestOhApiAudio: provider.requestAudio,
   };
 });
 
@@ -46,13 +54,18 @@ vi.mock("./ohapiDb", async importOriginal => {
       return state.existingRoom;
     }),
     dedupeOwnedOhapiRooms: store.dedupe,
-    consumeOhapiAllowance: vi.fn(async (_userId: number, _scope: string, limit: number) => {
-      calls.push("consumeAllowance");
+    consumeOhapiAllowance: vi.fn(async (_userId: number, scope: string, limit: number) => {
+      calls.push(scope === "media" ? "consumeMediaAllowance" : "consumeAllowance");
+      if (scope === "media") {
+        state.mediaAllowanceUsed += 1;
+        return original.describeOhapiAllowance(state.mediaAllowanceUsed, limit);
+      }
       state.allowanceUsed += 1;
       return original.describeOhapiAllowance(state.allowanceUsed, limit);
     }),
     refundOhapiAllowance: store.refund,
     createOhapiMessage: store.createMessage,
+    createOhapiMediaJob: store.createMediaJob,
     touchOhapiRoom: vi.fn(async () => {}),
   };
 });
@@ -76,6 +89,7 @@ beforeEach(() => {
   state.companion = { id: 11, providerCharacterId: "char-77", worldSlug: "ava-marchetti-4471", displayName: "Ava" };
   state.existingRoom = undefined;
   state.allowanceUsed = 0;
+  state.mediaAllowanceUsed = 0;
   state.roomsThisHour = 0;
   state.liveRooms = 0;
   provider.createRoom.mockReset().mockImplementation(async () => {
@@ -86,7 +100,14 @@ beforeEach(() => {
     calls.push("providerGenerateText");
     return { content: "Hi — good to hear from you.", toolCall: null, messageId: null };
   });
+  provider.requestImage.mockReset().mockImplementation(async () => {
+    calls.push("providerRequestImage");
+    return { jobId: "job-img-1", presignedUrl: null };
+  });
+  provider.requestVideo.mockReset().mockResolvedValue({ jobId: "job-vid-1", presignedUrl: null });
+  provider.requestAudio.mockReset().mockResolvedValue({ jobId: "job-aud-1", presignedUrl: null });
   store.createMessage.mockReset();
+  store.createMediaJob.mockReset().mockResolvedValue(undefined);
   store.refund.mockReset();
   store.dedupe.mockReset().mockResolvedValue({ kept: 501, retired: 0 });
 });
@@ -189,5 +210,91 @@ describe("chat.send end to end", () => {
 
     await expect(memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "hey" }))
       .rejects.toThrow(/temporarily unavailable/);
+  });
+});
+
+/**
+ * Asking her for a photo is the whole interaction. It has to cost what the
+ * generation panel costs, be owned the same way, and — above all — never take
+ * the conversation down with it when it cannot be done.
+ */
+describe("media asked for in conversation", () => {
+  it("starts a photo when the message asks for one, in the conversation's room", async () => {
+    const result = await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "can you send me a picture?",
+    });
+
+    expect(provider.requestImage).toHaveBeenCalledWith({
+      characterId: "char-77",
+      roomId: "room-abc",
+      prompt: "can you send me a picture?",
+    });
+    expect(result.media).toEqual({ jobId: "job-img-1", kind: "image" });
+  });
+
+  it("records the generation against the account and the room", async () => {
+    await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "send me a pic" });
+
+    expect(store.createMediaJob).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 7,
+      roomId: 501,
+      ohapiCharacterId: 11,
+      providerJobId: "job-img-1",
+      kind: "image",
+    }));
+  });
+
+  it("speaks the line she just wrote when asked for a voice note", async () => {
+    await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "send me a voice note" });
+
+    expect(provider.requestAudio).toHaveBeenCalledWith({
+      characterId: "char-77",
+      roomId: "room-abc",
+      text: "Hi — good to hear from you.",
+    });
+    expect(provider.requestImage).not.toHaveBeenCalled();
+  });
+
+  it("starts nothing for an ordinary message", async () => {
+    const result = await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "how was your day" });
+
+    expect(provider.requestImage).not.toHaveBeenCalled();
+    expect(provider.requestVideo).not.toHaveBeenCalled();
+    expect(provider.requestAudio).not.toHaveBeenCalled();
+    expect(result.media).toBeNull();
+  });
+
+  it("charges the generation allowance before the provider is asked", async () => {
+    await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "send me a photo" });
+
+    expect(calls.indexOf("consumeMediaAllowance")).toBeGreaterThan(-1);
+    expect(calls.indexOf("consumeMediaAllowance")).toBeLessThan(calls.indexOf("providerRequestImage"));
+  });
+
+  /** The reply is already written and paid for; losing it would be the worse bug. */
+  it("still delivers the reply when the generation allowance is spent", async () => {
+    state.mediaAllowanceUsed = 999;
+    const result = await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "send me a photo",
+    });
+
+    expect(result.content).toBe("Hi — good to hear from you.");
+    expect(result.media).toBeNull();
+    expect(provider.requestImage).not.toHaveBeenCalled();
+  });
+
+  it("still delivers the reply when the provider refuses the generation", async () => {
+    const { OhApiError } = await import("./ohapi");
+    provider.requestImage.mockRejectedValueOnce(new OhApiError("upstream exploded", 500));
+
+    const result = await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "send me a photo",
+    });
+
+    expect(result.content).toBe("Hi — good to hear from you.");
+    expect(result.media).toBeNull();
   });
 });

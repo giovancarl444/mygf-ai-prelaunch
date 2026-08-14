@@ -19,13 +19,13 @@ studio where it belongs.
 | `/companions` | Public | Full catalog with search and age filter. |
 | `/companion/:slug` | Public | One companion's profile, and the entry point to her chat. |
 | `/chat` | Signed in | Your conversations. |
-| `/chat/:slug` | Signed in + adult confirmed | The conversation, with photo, voice, and video generation beside it. |
+| `/chat/:slug` | Signed in + adult confirmed | The conversation. Photos, voice notes, and video are asked for in it and arrive in it. |
 | `/ops/ohapi` | Owner only | Operational studio: sync, curate, create. Not linked from the customer product. |
 | `/pilot` | — | Removed. Redirects to `/companions`. |
 
 ## The catalog is the provider library
 
-The public catalog is a projection of `GET /api/v1/characters`, synced into
+The public catalog is a projection of `GET /api/v1/customer-library`, synced into
 `ohapi_characters` from the studio. This matters: **everyone listed can actually
 be opened.** The previous catalog was eighteen hand-authored entries of which one
 had a provider mapping, so seventeen cards led nowhere real.
@@ -55,11 +55,37 @@ Consequences worth knowing:
 ## What a signed-in customer can do
 
 - Talk, with the thread persisted and account-owned.
-- Ask for a photo, a voice note, or a short video, generated in her likeness.
+- Ask her for a photo, a voice note, or a short video — in the conversation,
+  in ordinary words. It arrives as a message from her, with whatever line she
+  writes to go with it.
 - Rename and clear a thread. Clearing removes the stored transcript **and the
   generation records for that companion**, then retires the room. It does not
   claim to erase provider-retained records, and the product says so.
 - Report a conversation for safety or quality review.
+
+## Media is part of the conversation, not a form
+
+Saying "can you send me a picture?" is how you get one. `chat.send` reads the
+request out of the message, starts the generation against the same room, and the
+result lands in the thread at the point it was asked for — with the provider's
+`followup_text` as her accompanying line.
+
+Three things follow from that, and each is load-bearing:
+
+- **It never breaks the conversation.** By the time the generation is attempted
+  the reply is already written and charged. A spent generation allowance or a
+  provider refusal means she does not send the photo; it does not mean the
+  message fails.
+- **It costs exactly what the panel costs.** Same hourly allowance, same
+  ownership, charged before anything exists provider-side.
+- **Reading a request wrongly is the expensive mistake.** Inventing one spends
+  the customer's allowance and real credit on something they did not ask for, in
+  a thread they cannot undo, so detection is deliberately conservative and
+  under-triggers by design. `server/ohapiChatIntent.ts` holds the rules and
+  `server/ohapiChatIntent.test.ts` holds the cases.
+
+The generation panel still exists as a direct route to the same operations, and
+its results now land in the thread too.
 
 ## Limits
 

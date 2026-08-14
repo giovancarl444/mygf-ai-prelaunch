@@ -23,11 +23,32 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 
 type MediaTab = "image" | "audio" | "video";
-type ActiveJob = { jobId: string; kind: MediaTab; startedAt: number };
+type JobSource = "chat" | "panel";
+type ActiveJob = { jobId: string; kind: MediaTab; startedAt: number; source: JobSource };
 type ReportReason = "safety" | "quality" | "other";
+
+/** One entry in the thread. Media she sent sits in the same stream as her words. */
+type TimelineEntry =
+  | { key: string; at: number; type: "text"; role: "user" | "assistant"; content: string }
+  | {
+    key: string;
+    at: number;
+    type: "media";
+    jobId: string;
+    kind: MediaTab;
+    status: "pending" | "completed" | "failed";
+    resultUrl: string | null;
+    followupText: string | null;
+  };
 
 const JOB_TIMEOUT_MS = 5 * 60 * 1000;
 const JOB_POLL_MS = 2_000;
+
+const SENDING_COPY: Record<MediaTab, (name: string) => string> = {
+  image: name => `${name} is taking a photo…`,
+  video: name => `${name} is filming something…`,
+  audio: name => `${name} is recording a voice note…`,
+};
 
 export default function Chat() {
   const [, params] = useRoute("/chat/:slug");
@@ -63,14 +84,23 @@ export default function Chat() {
   const [reportDetail, setReportDetail] = useState("");
   const [reportSent, setReportSent] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Jobs already picked up from the transcript. Without this, one that times out
+  // would be adopted again on the next render and never stop being watched.
+  const adoptedJobs = useRef(new Set<string>());
 
   const confirmAdult = trpc.chat.confirmAdult.useMutation({
     onSuccess: async () => { await utils.chat.session.invalidate(); },
   });
 
   const send = trpc.chat.send.useMutation({
-    onSuccess: async () => {
+    onSuccess: async result => {
       setPendingMessage(null);
+      // She decided to send something. Watch it here so it settles in the
+      // thread without the customer having to open anything.
+      if (result.media) {
+        adoptedJobs.current.add(result.media.jobId);
+        setActiveJob({ jobId: result.media.jobId, kind: result.media.kind, startedAt: Date.now(), source: "chat" });
+      }
       await Promise.all([utils.chat.history.invalidate(), utils.chat.session.invalidate()]);
     },
     onError: () => setPendingMessage(null),
@@ -105,9 +135,10 @@ export default function Chat() {
 
   const onMediaSubmitted = async (result: { jobId: string }, kind: MediaTab) => {
     setJobError(null);
-    setActiveJob({ jobId: result.jobId, kind, startedAt: Date.now() });
+    adoptedJobs.current.add(result.jobId);
+    setActiveJob({ jobId: result.jobId, kind, startedAt: Date.now(), source: "panel" });
     setMediaPrompt("");
-    await utils.chat.session.invalidate();
+    await Promise.all([utils.chat.session.invalidate(), utils.chat.history.invalidate()]);
   };
 
   const imageJob = trpc.media.image.useMutation({
@@ -123,16 +154,41 @@ export default function Chat() {
     onError: error => setJobError(error.message),
   });
 
-  const messages = useMemo(() => {
-    const stored = history.data?.messages ?? [];
-    return pendingMessage
-      ? [...stored, { id: -1, role: "user" as const, content: pendingMessage }]
-      : stored;
-  }, [history.data?.messages, pendingMessage]);
+  // Words and media are one stream, ordered by when they happened, so a photo
+  // reads as something she sent in the middle of the conversation.
+  const timeline = useMemo<TimelineEntry[]>(() => {
+    const entries: TimelineEntry[] = [];
+    for (const message of history.data?.messages ?? []) {
+      entries.push({
+        key: `m${message.id}`,
+        at: message.createdAt.getTime(),
+        type: "text",
+        role: message.role,
+        content: message.content,
+      });
+    }
+    for (const item of history.data?.media ?? []) {
+      entries.push({
+        key: `j${item.jobId}`,
+        at: item.createdAt.getTime(),
+        type: "media",
+        jobId: item.jobId,
+        kind: item.kind,
+        status: item.status,
+        resultUrl: item.resultUrl,
+        followupText: item.followupText,
+      });
+    }
+    entries.sort((a, b) => a.at - b.at);
+    if (pendingMessage) {
+      entries.push({ key: "pending", at: Number.MAX_SAFE_INTEGER, type: "text", role: "user", content: pendingMessage });
+    }
+    return entries;
+  }, [history.data, pendingMessage]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages.length, send.isPending]);
+  }, [timeline.length, send.isPending]);
 
   // Everything on this screen is scoped to one companion, so switching away must
   // not leave the previous conversation's generation or report state on screen.
@@ -145,7 +201,19 @@ export default function Chat() {
     setClearArmed(false);
     setReportOpen(false);
     setReportSent(false);
+    adoptedJobs.current.clear();
   }, [slug]);
+
+  // A generation left running by an earlier visit is still in the thread. Pick
+  // up the newest one so it finishes on screen rather than on the next reload.
+  const unwatched = (history.data?.media ?? [])
+    .filter(item => item.status === "pending" && !adoptedJobs.current.has(item.jobId))
+    .at(-1);
+  useEffect(() => {
+    if (activeJob || !unwatched) return;
+    adoptedJobs.current.add(unwatched.jobId);
+    setActiveJob({ jobId: unwatched.jobId, kind: unwatched.kind, startedAt: Date.now(), source: "chat" });
+  }, [activeJob, unwatched]);
 
   // Stop polling a job that has outlived the documented five-minute ceiling.
   useEffect(() => {
@@ -158,10 +226,14 @@ export default function Chat() {
     return () => window.clearTimeout(timer);
   }, [activeJob]);
 
-  const completedJobId = jobStatus.data?.status === "completed" ? jobStatus.data.jobId : null;
+  // Settled either way: the thread has to stop showing a spinner for a photo
+  // that arrived, and for one that never will.
+  const settledJobId = jobStatus.data && jobStatus.data.status !== "pending" ? jobStatus.data.jobId : null;
   useEffect(() => {
-    if (completedJobId) void utils.media.gallery.invalidate();
-  }, [completedJobId, utils]);
+    if (!settledJobId) return;
+    void utils.media.gallery.invalidate();
+    void utils.chat.history.invalidate();
+  }, [settledJobId, utils]);
 
   const mediaBusy = imageJob.isPending || audioJob.isPending || videoJob.isPending
     || (Boolean(activeJob) && jobStatus.data?.status === "pending");
@@ -430,11 +502,43 @@ export default function Chat() {
 
               <div className="message-scroll" ref={scrollRef}>
                 <div className="message-list">
-                  {messages.length === 0 && !history.isLoading && (
-                    <div className="message assistant">Say something to {firstName} to start the conversation.</div>
+                  {timeline.length === 0 && !history.isLoading && (
+                    <div className="message assistant">
+                      Say something to {firstName} to start the conversation. Ask her for a
+                      photo, a video, or a voice note whenever you want one.
+                    </div>
                   )}
-                  {messages.map(message => (
-                    <div key={message.id} className={`message ${message.role}`}>{message.content}</div>
+                  {timeline.map(entry => entry.type === "text" ? (
+                    <div key={entry.key} className={`message ${entry.role}`}>{entry.content}</div>
+                  ) : (
+                    <div key={entry.key} className="message assistant message-media">
+                      {entry.status === "pending" && (
+                        <span className="message-media-status">
+                          <Loader2 className="animate-spin" size={14} />
+                          {SENDING_COPY[entry.kind](firstName)}
+                        </span>
+                      )}
+                      {entry.status === "failed" && (
+                        <span className="message-media-status">
+                          <CircleAlert size={14} />
+                          That one did not come out. Ask again whenever you like.
+                        </span>
+                      )}
+                      {entry.status === "completed" && entry.resultUrl && (
+                        <div className="message-media-frame">
+                          {entry.kind === "image" ? (
+                            <a href={entry.resultUrl} target="_blank" rel="noreferrer">
+                              <img src={entry.resultUrl} alt={`From ${firstName}`} loading="lazy" />
+                            </a>
+                          ) : entry.kind === "video" ? (
+                            <video controls src={entry.resultUrl} />
+                          ) : (
+                            <audio controls src={entry.resultUrl} />
+                          )}
+                        </div>
+                      )}
+                      {entry.followupText && <p className="message-media-caption">{entry.followupText}</p>}
+                    </div>
                   ))}
                   {send.isPending && (
                     <p className="message-typing">
@@ -559,21 +663,23 @@ export default function Chat() {
                   </p>
                 )}
 
-                {activeJob && jobStatus.data?.status === "pending" && (
+                {/* A generation asked for in conversation reports itself in the
+                    thread, so only panel submissions are tracked here. */}
+                {activeJob?.source === "panel" && jobStatus.data?.status === "pending" && (
                   <div className="media-progress">
                     <Loader2 className="animate-spin" size={16} />
                     Working on your {activeJob.kind}…
                   </div>
                 )}
 
-                {jobStatus.data?.status === "failed" && (
+                {activeJob?.source === "panel" && jobStatus.data?.status === "failed" && (
                   <p className="chat-error media-inline-error">
                     <CircleAlert size={15} />
                     {jobStatus.data.errorMessage ?? "That generation could not be completed."}
                   </p>
                 )}
 
-                {jobStatus.data?.status === "completed" && jobStatus.data.resultUrl && (
+                {activeJob?.source === "panel" && jobStatus.data?.status === "completed" && jobStatus.data.resultUrl && (
                   <div className="media-result">
                     {jobStatus.data.kind === "image" && <img src={jobStatus.data.resultUrl} alt="Generated result" />}
                     {jobStatus.data.kind === "video" && <video controls src={jobStatus.data.resultUrl} />}

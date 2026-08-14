@@ -37,6 +37,8 @@ OHAPI_API_KEY='...' node scripts/ohapi-probe.mjs --image  # costs credit
 | --- | --- |
 | `server/ohapi.ts` | Provider client. The only file that talks to OhAPI. |
 | `server/ohapiChat.ts` | Conversation. Allowance is charged before any provider resource is created. |
+| `server/ohapiChatIntent.ts` | Reads a request for a photo, video, or voice note out of a message. Conservative on purpose. |
+| `server/ohapiMediaJobs.ts` | Job submission and settlement, shared by conversation and the panel. |
 | `server/ohapiMedia.ts` | Image, video, audio, job polling. Jobs are owned per account. |
 | `server/ohapiCompanions.ts` | Public catalog. Degrades to empty rather than failing the page. |
 | `server/ohapiStudio.ts` | Owner-only operations at `/ops/ohapi`. |

@@ -889,6 +889,49 @@ p {
   color: #fff;
 }
 
+/* A photo, video, or voice note she sent, sitting in the thread with her words. */
+.message-media {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-width: min(74%, 340px);
+  padding: 9px;
+}
+
+.message-media-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 5px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.message-media-frame {
+  overflow: hidden;
+  border-radius: 11px;
+  background: var(--bg-elevated);
+}
+
+.message-media-frame img,
+.message-media-frame video {
+  display: block;
+  width: 100%;
+}
+
+.message-media-frame audio {
+  display: block;
+  width: 100%;
+  padding: 8px;
+}
+
+.message-media-caption {
+  margin: 0;
+  padding: 0 5px 2px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .message-typing {
   display: flex;
   align-items: center;

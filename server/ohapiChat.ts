@@ -2,8 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { adultProcedure } from "./ohapiAccess";
-import { createOhApiRoom, generateOhApiText } from "./ohapi";
+import { createOhApiRoom, generateOhApiText, requestOhApiAudio, requestOhApiImage, requestOhApiVideo } from "./ohapi";
+import { type ChatMediaKind, detectChatMediaRequest } from "./ohapiChatIntent";
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
+import { submitMediaJob } from "./ohapiMediaJobs";
 import {
   clearOwnedOhapiRoom,
   consumeOhapiAllowance,
@@ -18,6 +20,7 @@ import {
   getUserAdultConfirmedAt,
   HOURLY_ROOM_LIMIT,
   HOURLY_TEXT_LIMIT,
+  listOhapiRoomMediaJobs,
   listOwnedOhapiMessages,
   listOwnedOhapiRooms,
   markUserAdultConfirmed,
@@ -101,6 +104,69 @@ async function ensureOwnedRoom(input: { userId: number; ohapiCharacterId: number
   }
 }
 
+/**
+ * How long a generation may sit unfinished before the transcript stops showing
+ * it. Nothing polls a job once the tab closes, so without this a conversation
+ * would keep a spinner from last week in it forever. The gallery's reconciler
+ * owns settling those.
+ */
+const TRANSCRIPT_PENDING_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Starts the generation a message asked for, without ever failing the message.
+ *
+ * By the time this runs the reply has already been written and charged, so a
+ * spent generation allowance or a provider refusal must not take the
+ * conversation down with it. She simply does not send the photo.
+ */
+async function startRequestedMedia(input: {
+  userId: number;
+  kind: ChatMediaKind;
+  ohapiCharacterId: number;
+  providerCharacterId: string;
+  roomId: number;
+  providerRoomId: string;
+  message: string;
+  reply: string;
+}) {
+  try {
+    const submitted = await submitMediaJob({
+      userId: input.userId,
+      kind: input.kind,
+      // A voice note says the line she just wrote. A photo or a video is
+      // described by what was asked for; the in-room flow supplies the rest of
+      // the context from the conversation itself.
+      prompt: input.kind === "audio" ? input.reply : input.message,
+      ohapiCharacterId: input.ohapiCharacterId,
+      roomId: input.roomId,
+      submit: () => {
+        if (input.kind === "audio") {
+          return requestOhApiAudio({
+            characterId: input.providerCharacterId,
+            roomId: input.providerRoomId,
+            text: input.reply,
+          });
+        }
+        if (input.kind === "video") {
+          return requestOhApiVideo({
+            characterId: input.providerCharacterId,
+            prompt: input.message,
+          });
+        }
+        return requestOhApiImage({
+          characterId: input.providerCharacterId,
+          roomId: input.providerRoomId,
+          prompt: input.message,
+        });
+      },
+    });
+    return { jobId: submitted.jobId, kind: input.kind };
+  } catch (error) {
+    console.error("[Chat] A requested generation could not be started:", error);
+    return null;
+  }
+}
+
 export const ohapiChatRouter = router({
   /** Account state the chat UI needs before it can send anything. */
   session: protectedProcedure.query(async ({ ctx }) => {
@@ -122,15 +188,67 @@ export const ohapiChatRouter = router({
     return { adultConfirmed: true, confirmedAt };
   }),
 
+  /**
+   * The conversation, including the media in it.
+   *
+   * Photos, videos, and voice notes are part of the thread rather than a
+   * separate collection: they are things she sent, at a point in time, often
+   * with a line of her own attached. They are returned alongside the messages
+   * and interleaved by timestamp.
+   */
   history: protectedProcedure.input(z.object({ worldSlug: worldSlugSchema })).query(async ({ ctx, input }) => {
+    const empty = {
+      room: null,
+      messages: [] as { id: number; role: "user" | "assistant"; content: string; createdAt: Date }[],
+      media: [] as {
+        jobId: string;
+        kind: "image" | "video" | "audio";
+        status: "pending" | "completed" | "failed";
+        resultUrl: string | null;
+        followupText: string | null;
+        createdAt: Date;
+      }[],
+    };
+
     const character = await getChattableOhapiCharacter(input.worldSlug);
-    if (!character) return { room: null, messages: [] as { role: "user" | "assistant"; content: string; id: number }[] };
+    if (!character) return empty;
 
     const room = await getOwnedOhapiRoom({ userId: ctx.user.id, ohapiCharacterId: character.id });
-    const messages = room ? await listOwnedOhapiMessages(room.id) : [];
+    if (!room) return empty;
+
+    const [messages, media] = await Promise.all([
+      listOwnedOhapiMessages(room.id),
+      listOhapiRoomMediaJobs(room.id),
+    ]);
+
+    const staleBefore = Date.now() - TRANSCRIPT_PENDING_WINDOW_MS;
     return {
-      room: room ? { id: room.id, title: room.title } : null,
-      messages: messages.map(message => ({ id: message.id, role: message.role, content: message.content })),
+      room: { id: room.id, title: room.title },
+      messages: messages.map(message => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        createdAt: message.createdAt,
+      })),
+      media: media
+        .filter(job => {
+          // A finished generation belongs in the thread for as long as its link
+          // resolves. One that is still running, or that failed, is only worth
+          // showing while it is recent enough to mean something.
+          if (job.status === "completed") return Boolean(job.resultUrl);
+          if (job.status === "expired") return false;
+          return job.createdAt.getTime() > staleBefore;
+        })
+        .map(job => ({
+          jobId: job.providerJobId,
+          kind: job.kind,
+          status: job.status === "completed" ? ("completed" as const)
+            : job.status === "failed" ? ("failed" as const)
+              : ("pending" as const),
+          resultUrl: job.status === "completed" ? job.resultUrl : null,
+          followupText: job.status === "completed" ? job.followupText : null,
+          createdAt: job.createdAt,
+        })),
     };
   }),
 
@@ -172,10 +290,29 @@ export const ohapiChatRouter = router({
       });
       await createOhapiMessage({ roomId: room.id, role: "assistant", content: reply.content });
       await touchOhapiRoom(room.id);
+
+      // Asking her for a photo is how you get one. The generation is started
+      // here, after the reply, so it lands in the thread as something she sent
+      // rather than as the output of a form.
+      const requested = detectChatMediaRequest(input.message);
+      const media = requested
+        ? await startRequestedMedia({
+          userId: ctx.user.id,
+          kind: requested,
+          ohapiCharacterId: character.id,
+          providerCharacterId: character.providerCharacterId!,
+          roomId: room.id,
+          providerRoomId: room.providerRoomId,
+          message: input.message,
+          reply: reply.content,
+        })
+        : null;
+
       return {
         content: reply.content,
         remaining: allowance.remaining,
         resetAt: allowance.resetAt,
+        media,
         // Owner-only diagnostic. The provider signals something here that the
         // reply text does not express, and its shape needs observing before any
         // behaviour is built on it.
