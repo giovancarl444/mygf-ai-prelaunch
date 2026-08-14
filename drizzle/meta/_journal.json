@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1786693849901,
+      "tag": "0000_omniscient_lily_hollister",
+      "breakpoints": true
+    }
+  ]
 }

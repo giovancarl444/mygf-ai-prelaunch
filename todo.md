@@ -1,0 +1,15 @@
+# Project TODO
+
+- [ ] Establish four named Git backup milestones and record their remote status.
+- [ ] Build the dark violet-neon visual system with accessible tokens, premium typography, and responsive motion.
+- [ ] Implement the exact hero headline, positioning copy, navigation, and beta-interest CTA flow.
+- [ ] Create six CSS-only companion world preview cards with original names, mood statements, first-line teasers, and world tags.
+- [ ] Add the exact three-pillar trust and privacy section without therapeutic or false-presence claims.
+- [ ] Add the exact three-step how-it-works flow: Choose a world → Build your thread → Your memory, your rules.
+- [ ] Implement a database-backed private-beta interest form with email, optional motivation selector, timestamp, and source.
+- [ ] Send an owner notification containing each successful beta-interest email and selected motivation.
+- [ ] Add privacy-forward form states, validation, duplicate handling, and user feedback.
+- [ ] Implement the exact footer disclaimer and an adult-only, pre-launch expectation boundary.
+- [ ] Write and run Vitest coverage for beta-interest validation, persistence behavior, duplicate handling, and notification triggering.
+- [ ] Verify desktop and mobile rendering, form behavior, accessibility, and server logs.
+- [ ] Save the completed web project checkpoint, publish it, and report the live URL plus Git backup status.
