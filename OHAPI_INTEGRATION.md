@@ -7,7 +7,7 @@ This document records the request and response shapes the application actually
 sends. It supersedes `OHAPI_API_COMPLIANCE_AUDIT.md`, which described a contract
 that did not match the documentation.
 
-## The documentation is wrong in three places
+## The documentation is wrong in five places
 
 Every shape below was verified against the live service on 14 August 2026.
 Where the documentation and the service disagree, **the service wins** and this
@@ -15,9 +15,15 @@ file records what it actually does. `server/ohapiContract.test.ts` locks each on
 
 | Area | Documented | Actually |
 | --- | --- | --- |
-| Character listing | `GET /api/v1/characters` | **Does not exist** — returns `403 {"message":"Unknown endpoint"}`. `GET /api/v1/customer-library` is the real listing. |
+| Character listing | `GET /api/v1/characters` | **Does not exist** — `403 {"message":"Unknown endpoint"}`. `GET /api/v1/customer-library` is the real listing. |
 | Character fields | `character_id`, `name`, `profile_image_url`, `age`, `occupation`, `type` | `characterId` (a **number**), `firstName`, `lastName`, `sfwImage`. No age, occupation, or type is returned at all. |
 | Room creation | `{ character_id }` | Also requires `user_id` (or legacy `user_gender`), and `character_id` must be a **string** despite being returned as a number. |
+| Audio | `POST /api/v1/audio` | **Does not exist** — `403 Unknown endpoint`. `POST /api/v1/audio/notes` is the real path. |
+| Cam | `POST /api/v1/cam/create` | **Does not exist** on this account — `403 Unknown endpoint`. No Cam path responds. |
+
+Empty request bodies are a cheap way to re-check this: the service replies with
+a validation error naming its own required fields, and nothing is generated or
+billed. That is how `user_id` and the in-room flow were found.
 
 A correction to an earlier note in this file: the original implementation's
 `POST /api/v1/text { room_id, prompt }` was **not** broken. The service accepts
@@ -33,18 +39,23 @@ it — that field was load-bearing, and `user_id` now takes its place.
 | Character library | `GET /api/v1/customer-library` | — | `{ success, characters[], digitalTwins[] }` |
 | Create room | `POST /api/v1/rooms` | `{ character_id: string, user_id: string }` | `{ room_id }` (a UUID) |
 | Chat | `POST /api/v1/text` | `{ room_id, character_id, message }` | `{ content, job_id, message_id, tool_call }` |
-| Image | `POST /api/v1/images` | `{ character_id, prompt }` | `job_id`, `presigned_url` |
-| Video | `POST /api/v1/videos/create` | `{ character_id, prompt }` or `{ image_url, prompt }`, optional `prompt_enhancement` | `job_id`, `presigned_url` |
-| Audio | `POST /api/v1/audio` | `{ character_id, text }` | `job_id`, `presigned_url` |
-| Job status | `GET /api/v1/jobs/{job_id}/status` | — | `status`, `presigned_url` |
-| Cam session | `POST /api/v1/cam/create` | `{ characterId, restEndpointUrl, apiKey }` | session id, avatar URL, auth token |
+| Image | `POST /api/v1/images` | `{ character_id, prompt }`, plus `room_id` for the in-room flow | 202 with `job_id`, `presigned_url` |
+| Video | `POST /api/v1/videos/create` | `{ character_id, prompt }` or `{ image_url, prompt }`, optional `prompt_enhancement` | 202 with `job_id`, `presigned_url` |
+| Audio | `POST /api/v1/audio/notes` | `{ character_id, text }`, plus `room_id` for the in-room flow | 202 with `job_id`, `presigned_url` |
+| Job status | `GET /api/v1/jobs/{job_id}/status` | — | `{ job_id, status, url, results, error }` |
 | Generate candidate | `POST /api/v2/characters/generate` | character brief | `characterGuid` |
 | Candidate status | `GET /api/v2/characters/{guid}/status` | — | `status`, `characterId` |
 | Save candidate | `POST /api/v2/characters/save` | `{ characterGuid }` | `status` |
 
-Cam is documented and implemented in the isolated playground, but is not exposed
-in the production product. It requires a public webhook receiver, which is a
-separate design.
+**Cam is not available.** Every documented Cam path answers `403 Unknown
+endpoint` on this account, so it is not a design decision to defer it — there is
+nothing to call. The playground still shows a Cam tab; it will fail. Revisit only
+if the provider confirms the capability is enabled.
+
+**The in-room flow.** Both images and audio accept `room_id` instead of, or
+alongside, `character_id`. When the customer already has a conversation open its
+room is passed, so the generation carries that context — and it is the in-room
+flow that returns the companion's accompanying line.
 
 ## Portraits expire after one hour
 

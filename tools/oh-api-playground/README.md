@@ -28,3 +28,17 @@ The public MyGF.ai application follows a different security model: it keeps prov
 
 The initial build supports direct testing for character discovery, room-based chat, asynchronous image/video/audio jobs, and Cam session creation. It surfaces response diagnostics and uses a five-minute polling limit for asynchronous jobs.
 
+
+## Verified endpoint notes
+
+Checked against the live service on 14 August 2026:
+
+- Audio is `POST /api/v1/audio/notes`. The documented `/api/v1/audio` returns
+  `403 Unknown endpoint`.
+- The **Cam tab does not work.** Every documented Cam path returns
+  `403 Unknown endpoint` on this account.
+- `GET /api/v1/characters` does not exist either; `customer-library` is the real
+  listing, and it returns `characterId` as a number with `firstName` / `lastName`
+  / `sfwImage`.
+
+See `OHAPI_INTEGRATION.md` in the repository root for the full contract.

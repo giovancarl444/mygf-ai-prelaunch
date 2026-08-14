@@ -16,6 +16,7 @@ import {
   expireOldPendingOhapiMediaJobs,
   getChattableOhapiCharacter,
   getOwnedOhapiMediaJob,
+  getOwnedOhapiRoom,
   HOURLY_MEDIA_LIMIT,
   listOwnedOhapiMediaJobs,
   listStaleOhapiMediaJobs,
@@ -44,6 +45,7 @@ async function submitMediaJob<T extends { jobId: string; presignedUrl: string | 
   kind: "image" | "video" | "audio";
   prompt: string;
   ohapiCharacterId?: number | null;
+  roomId?: number | null;
   submit: () => Promise<T>;
 }) {
   const allowance = await consumeOhapiAllowance(input.userId, "media", HOURLY_MEDIA_LIMIT);
@@ -68,6 +70,7 @@ async function submitMediaJob<T extends { jobId: string; presignedUrl: string | 
   await createOhapiMediaJob({
     userId: input.userId,
     ohapiCharacterId: input.ohapiCharacterId ?? null,
+    roomId: input.roomId ?? null,
     providerJobId: submission.jobId,
     kind: input.kind,
     prompt: input.prompt,
@@ -121,12 +124,19 @@ export const ohapiMediaRouter = router({
     prompt: promptSchema,
   })).mutation(async ({ ctx, input }) => {
     const character = await requireCompanion(input.worldSlug);
+    const room = await getOwnedOhapiRoom({ userId: ctx.user.id, ohapiCharacterId: character.id });
     return submitMediaJob({
       userId: ctx.user.id,
       kind: "image",
       prompt: input.prompt,
       ohapiCharacterId: character.id,
-      submit: () => requestOhApiImage({ characterId: character.providerCharacterId!, prompt: input.prompt }),
+      roomId: room?.id ?? null,
+      submit: () => requestOhApiImage({
+        characterId: character.providerCharacterId!,
+        // The in-room flow gives the generation the conversation's context.
+        roomId: room?.providerRoomId,
+        prompt: input.prompt,
+      }),
     });
   }),
 
@@ -160,12 +170,18 @@ export const ohapiMediaRouter = router({
     text: z.string().trim().min(1, "Write what she should say.").max(1_000),
   })).mutation(async ({ ctx, input }) => {
     const character = await requireCompanion(input.worldSlug);
+    const room = await getOwnedOhapiRoom({ userId: ctx.user.id, ohapiCharacterId: character.id });
     return submitMediaJob({
       userId: ctx.user.id,
       kind: "audio",
       prompt: input.text,
       ohapiCharacterId: character.id,
-      submit: () => requestOhApiAudio({ characterId: character.providerCharacterId!, text: input.text }),
+      roomId: room?.id ?? null,
+      submit: () => requestOhApiAudio({
+        characterId: character.providerCharacterId!,
+        roomId: room?.providerRoomId,
+        text: input.text,
+      }),
     });
   }),
 

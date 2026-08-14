@@ -95,12 +95,26 @@ describe("verified OhAPI request contract", () => {
     expect(job.jobId).toBe("job-1");
   });
 
-  it("requests audio with character_id and text", async () => {
+  /**
+   * The documented `/api/v1/audio` does not exist — it answers 403 "Unknown
+   * endpoint". `/api/v1/audio/notes` is the real path.
+   */
+  it("requests audio on the notes path, not the documented one", async () => {
     respondWith({ job_id: "job-2" });
     await requestOhApiAudio({ characterId: "char-1", text: "say this" });
 
-    expect(lastRequest().url).toBe("https://api.oh.xyz/api/v1/audio");
+    expect(lastRequest().url).toBe("https://api.oh.xyz/api/v1/audio/notes");
     expect(lastRequest().body).toEqual({ character_id: "char-1", text: "say this" });
+  });
+
+  it("uses the in-room flow for image and audio when a room exists", async () => {
+    respondWith({ job_id: "job-5" });
+    await requestOhApiImage({ characterId: "char-1", roomId: "room-9", prompt: "a portrait" });
+    expect(lastRequest().body).toEqual({ character_id: "char-1", room_id: "room-9", prompt: "a portrait" });
+
+    respondWith({ job_id: "job-6" });
+    await requestOhApiAudio({ characterId: "char-1", roomId: "room-9", text: "say this" });
+    expect(lastRequest().body).toEqual({ character_id: "char-1", room_id: "room-9", text: "say this" });
   });
 
   it("supports both documented video modes without mixing their fields", async () => {

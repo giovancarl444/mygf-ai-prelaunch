@@ -280,12 +280,18 @@ function readJobSubmission(body: unknown): OhApiJobSubmission {
   return { jobId, presignedUrl: readString(body, ["presigned_url", "presignedUrl", "url"]) ?? null };
 }
 
-/** POST /api/v1/images — `{ character_id, prompt }`. */
-export async function requestOhApiImage(input: { characterId: string; prompt: string }) {
-  const response = await ohApiFetch("/api/v1/images", {
-    method: "POST",
-    body: JSON.stringify({ character_id: input.characterId, prompt: input.prompt }),
-  });
+/**
+ * POST /api/v1/images
+ *
+ * Accepts `character_id` or, for the in-room flow, `room_id`. Both are sent when
+ * a room exists so the generation carries the conversation's context; the
+ * in-room flow is also what returns the companion's accompanying line.
+ */
+export async function requestOhApiImage(input: { characterId: string; roomId?: string; prompt: string }) {
+  const body: Record<string, unknown> = { character_id: String(input.characterId), prompt: input.prompt };
+  if (input.roomId) body.room_id = input.roomId;
+
+  const response = await ohApiFetch("/api/v1/images", { method: "POST", body: JSON.stringify(body) });
   return readJobSubmission(await response.json() as unknown);
 }
 
@@ -297,7 +303,7 @@ export async function requestOhApiVideo(input: {
   promptEnhancement?: boolean;
 }) {
   const body: Record<string, unknown> = { prompt: input.prompt };
-  if (input.characterId) body.character_id = input.characterId;
+  if (input.characterId) body.character_id = String(input.characterId);
   if (input.imageUrl) body.image_url = input.imageUrl;
   if (input.promptEnhancement) body.prompt_enhancement = true;
 
@@ -305,12 +311,17 @@ export async function requestOhApiVideo(input: {
   return readJobSubmission(await response.json() as unknown);
 }
 
-/** POST /api/v1/audio — `{ character_id, text }`. */
-export async function requestOhApiAudio(input: { characterId: string; text: string }) {
-  const response = await ohApiFetch("/api/v1/audio", {
-    method: "POST",
-    body: JSON.stringify({ character_id: input.characterId, text: input.text }),
-  });
+/**
+ * POST /api/v1/audio/notes
+ *
+ * The documented `/api/v1/audio` does not exist — it answers 403 "Unknown
+ * endpoint". Like images, this accepts `room_id` or `character_id`.
+ */
+export async function requestOhApiAudio(input: { characterId: string; roomId?: string; text: string }) {
+  const body: Record<string, unknown> = { character_id: String(input.characterId), text: input.text };
+  if (input.roomId) body.room_id = input.roomId;
+
+  const response = await ohApiFetch("/api/v1/audio/notes", { method: "POST", body: JSON.stringify(body) });
   return readJobSubmission(await response.json() as unknown);
 }
 

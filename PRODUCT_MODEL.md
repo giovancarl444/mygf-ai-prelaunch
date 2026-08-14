@@ -70,8 +70,9 @@ rejection.
 
 ## What is deliberately not built
 
-- **Cam.** Documented and present in the isolated playground, but it needs a public
-  webhook receiver and a separate safety design before it belongs in the product.
+- **Cam.** Not built, and not currently buildable: every documented Cam endpoint
+  answers `403 Unknown endpoint` on this account. It would also need a public
+  webhook receiver and a separate safety design.
 - **Public media galleries.** Generated media is private to the account that
   requested it. There is no shared or public feed.
 - **Durable media storage.** Measured against the live service, generated media
