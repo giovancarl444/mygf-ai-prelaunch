@@ -17,6 +17,9 @@ against the live service:
 - Characters return `characterId` (a number), `firstName`, `lastName`, `sfwImage`.
 - `POST /api/v1/rooms` requires `user_id`, and `character_id` must be a string.
 - Portrait URLs expire after 1 hour; generated media lasts 7 days.
+- The docs render request tables client-side. A plain text fetch returns a
+  partial page — read the rendered page, or you will conclude fields do not
+  exist when they do. That mistake has already been made once.
 
 `server/ohapi.ts` matches the live service, and `server/ohapiContract.test.ts`
 locks it. `OHAPI_INTEGRATION.md` records every divergence. **Do not "correct"

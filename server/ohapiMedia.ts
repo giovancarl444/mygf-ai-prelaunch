@@ -10,7 +10,7 @@ import {
   requestOhApiVideo,
 } from "./ohapi";
 import { providerFailure } from "./ohapiErrors";
-import { reconcileStaleJobs, submitMediaJob } from "./ohapiMediaJobs";
+import { PHOTO_RESOLUTION, reconcileStaleJobs, submitMediaJob, USE_PROMPT_ENHANCEMENT } from "./ohapiMediaJobs";
 import {
   getChattableOhapiCharacter,
   getOwnedOhapiMediaJob,
@@ -48,6 +48,9 @@ export const ohapiMediaRouter = router({
         // The in-room flow gives the generation the conversation's context.
         roomId: room?.providerRoomId,
         prompt: input.prompt,
+        promptEnhancement: USE_PROMPT_ENHANCEMENT,
+        resolution: PHOTO_RESOLUTION,
+        userGender: room?.userGender ?? undefined,
       }),
     });
   }),
@@ -72,7 +75,7 @@ export const ohapiMediaRouter = router({
         characterId: character?.providerCharacterId ?? undefined,
         imageUrl: input.imageUrl,
         prompt: input.prompt,
-        promptEnhancement: input.promptEnhancement,
+        promptEnhancement: input.promptEnhancement ?? USE_PROMPT_ENHANCEMENT,
       }),
     });
   }),

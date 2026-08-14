@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { classifyOhApiJob, getOhApiJobStatus } from "./ohapi";
+import { classifyOhApiJob, getOhApiJobStatus, type OhApiResolution } from "./ohapi";
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import {
   consumeOhapiAllowance,
@@ -10,6 +10,22 @@ import {
   refundOhapiAllowance,
   updateOhapiMediaJob,
 } from "./ohapiDb";
+
+/**
+ * Let the provider expand the prompt with its own model.
+ *
+ * A customer types "send me a pic", not a description of a photograph, and no
+ * template we write turns one into the other. The provider's own enhancement
+ * has the character and the conversation to work from, which is more than a
+ * fixed phrasing of ours ever will.
+ */
+export const USE_PROMPT_ENHANCEMENT = true;
+
+/**
+ * Portrait, and the largest portrait preset offered: 720×1280. A photo she
+ * sends should be the shape of a photo taken on a phone.
+ */
+export const PHOTO_RESOLUTION: OhApiResolution = "9:16";
 
 /**
  * Charges one media attempt, runs the provider submission, and records the job

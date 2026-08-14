@@ -299,18 +299,59 @@ function readJobSubmission(body: unknown): OhApiJobSubmission {
 }
 
 /**
+ * Output shapes the provider documents, and the sizes they map to:
+ * 9:16 → 720×1280, 16:9 → 1280×720, 1:1 → 1024×1024, 4:3 → 960×720,
+ * 3:4 → 720×960. An explicit [width, height] array is also accepted; only the
+ * presets are offered here because their limits are known.
+ */
+export type OhApiResolution = "9:16" | "16:9" | "1:1" | "4:3" | "3:4";
+
+/**
  * POST /api/v1/images
  *
  * Accepts `character_id` or, for the in-room flow, `room_id`. Both are sent when
  * a room exists so the generation carries the conversation's context; the
  * in-room flow is also what returns the companion's accompanying line.
  */
-export async function requestOhApiImage(input: { characterId: string; roomId?: string; prompt: string }) {
-  const body: Record<string, unknown> = { character_id: String(input.characterId), prompt: input.prompt };
-  if (input.roomId) body.room_id = input.roomId;
+export async function requestOhApiImage(input: {
+  characterId: string;
+  roomId?: string;
+  prompt: string;
+  promptEnhancement?: boolean;
+  resolution?: OhApiResolution;
+  userGender?: "male" | "female";
+}) {
+  // The fields this service is known to accept, because we have watched it
+  // accept them. Everything else is additive and can be dropped.
+  const verified: Record<string, unknown> = { character_id: String(input.characterId), prompt: input.prompt };
+  if (input.roomId) verified.room_id = input.roomId;
 
-  const response = await ohApiFetch("/api/v1/images", { method: "POST", body: JSON.stringify(body) });
-  return readJobSubmission(await response.json() as unknown);
+  const tuning: Record<string, unknown> = {};
+  if (input.promptEnhancement !== undefined) tuning.prompt_enhancement = input.promptEnhancement;
+  if (input.resolution) tuning.resolution = input.resolution;
+  if (input.userGender) tuning.user_gender = input.userGender;
+
+  try {
+    const response = await ohApiFetch("/api/v1/images", {
+      method: "POST",
+      body: JSON.stringify({ ...verified, ...tuning }),
+    });
+    return readJobSubmission(await response.json() as unknown);
+  } catch (error) {
+    // The published documentation has been wrong about this service more than
+    // once, and these fields are documented rather than observed. If the
+    // service rejects the request for shape, fall back to the request we know
+    // works: a customer waiting for a photo should not pay for our optimism.
+    const rejected = error instanceof OhApiError && error.status === 400;
+    if (!rejected || !Object.keys(tuning).length) throw error;
+
+    console.warn(
+      "[OhAPI] The image endpoint rejected the documented tuning fields (%s). Retrying without them.",
+      Object.keys(tuning).join(", "),
+    );
+    const response = await ohApiFetch("/api/v1/images", { method: "POST", body: JSON.stringify(verified) });
+    return readJobSubmission(await response.json() as unknown);
+  }
 }
 
 /** POST /api/v1/videos/create — text-to-video or image-to-video. */

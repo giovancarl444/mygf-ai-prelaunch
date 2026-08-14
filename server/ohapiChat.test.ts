@@ -227,11 +227,11 @@ describe("media asked for in conversation", () => {
 
     // Not the message. The message is how you ask; it is not a description of
     // a picture, and generating from it verbatim is our own quality problem.
-    expect(provider.requestImage).toHaveBeenCalledWith({
+    expect(provider.requestImage).toHaveBeenCalledWith(expect.objectContaining({
       characterId: "char-77",
       roomId: "room-abc",
-      prompt: "A photo of Ava, right now, wherever she is.",
-    });
+      prompt: "A photo of Ava.",
+    }));
     expect(result.media).toEqual({ jobId: "job-img-1", kind: "image" });
   });
 
@@ -243,6 +243,15 @@ describe("media asked for in conversation", () => {
 
     expect(provider.requestImage).toHaveBeenCalledWith(expect.objectContaining({
       prompt: "A photo of Ava at the beach.",
+    }));
+  });
+
+  it("asks the provider to enhance the prompt and fixes the output shape", async () => {
+    await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "send me a pic" });
+
+    expect(provider.requestImage).toHaveBeenCalledWith(expect.objectContaining({
+      promptEnhancement: true,
+      resolution: "9:16",
     }));
   });
 

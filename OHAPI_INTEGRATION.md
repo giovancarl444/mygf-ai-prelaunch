@@ -109,12 +109,35 @@ surfaced to the owner on `media.jobStatus`. This is the only view we have of
 that rewrite, and it is what separates a prompt problem from a model problem
 when a result looks poor — without it, image quality is guesswork.
 
-The published documentation lists **no** quality, resolution, model, sampler,
-seed, or aspect-ratio parameters on any media endpoint; `{ character_id,
-prompt }` is the entire documented image request. Verified 14 August 2026. Until
-the provider exposes more, the prompt is the only quality lever we hold, which
-is why `server/ohapiChatIntent.ts` composes one rather than forwarding the
-customer's message verbatim.
+### Image quality controls
+
+**Correction, 14 August 2026.** An earlier note here said the documentation
+exposed no quality parameters. That was wrong: it came from a text fetch of
+`api.oh.xyz/documentation`, which renders its request tables client-side, so the
+fetch returned a partial page and the absence was read as fact. The rendered
+page documents four optional fields on `POST /api/v1/images`:
+
+| Field | Type | What it does |
+| --- | --- | --- |
+| `prompt_enhancement` | boolean | The provider expands the prompt with its own model to improve quality and detail. Disabled, the prompt is used as-is. |
+| `user_gender` | `male` \| `female` | Tailors the scene when enhancement is on. Omitted, it defaults to the opposite of the character's gender. |
+| `resolution` | string \| `[w, h]` | `9:16` → 720×1280, `16:9` → 1280×720, `1:1` → 1024×1024, `4:3` → 960×720, `3:4` → 720×960. An explicit `[width, height]` array is also accepted. |
+| `character_id`, `prompt` | string | Required. |
+
+All four are now sent from `server/ohapiMediaJobs.ts`: enhancement on,
+resolution `9:16`, and `user_gender` only when the room recorded one.
+
+**These are documented, not observed.** This documentation has been wrong about
+this service before — see the audio path above — and the API key needed to probe
+it has been rotated out. So `requestOhApiImage` sends the tuning fields and, if
+the service answers 400, retries once with only the request shape we have
+watched succeed. A customer waiting for a photo should not pay for our optimism.
+`ohapiContract.test.ts` pins both paths.
+
+Related divergence: the documented text request is `{ room_id, prompt }` with no
+`character_id`. We send `{ room_id, character_id, message }`, which is what the
+live service was observed to accept. Not changed — see the standing rule about
+not correcting this code to match the documentation.
 
 Every job is written to `ohapi_media_jobs` with the requesting `userId`. A job is
 only pollable by the account that created it, so a job id is never a bearer token

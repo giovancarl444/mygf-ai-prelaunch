@@ -77,23 +77,23 @@ describe("turning the message into a prompt", () => {
   });
 
   it("keeps a modifier that came before the noun", () => {
-    expect(prompt("send me a sexy pic")).toBe("A sexy photo of Sienna, right now, wherever she is.");
+    expect(prompt("send me a sexy pic")).toBe("A sexy photo of Sienna.");
   });
 
   it("keeps a selfie a selfie", () => {
-    expect(prompt("take a selfie for me")).toBe("A selfie of Sienna, right now, wherever she is.");
+    expect(prompt("take a selfie for me")).toBe("A selfie of Sienna.");
   });
 
   it("throws away the ask when the ask is all there was", () => {
     // The real message from the first live test. Verbatim, this is a bad prompt.
     expect(prompt("Great, can you just try sending a photo? Trying to see if itworks"))
-      .toBe("A photo of Sienna, right now, wherever she is.");
-    expect(prompt("send me a photo")).toBe("A photo of Sienna, right now, wherever she is.");
+      .toBe("A photo of Sienna.");
+    expect(prompt("send me a photo")).toBe("A photo of Sienna.");
   });
 
   it("drops the subject it already knows", () => {
-    expect(prompt("send me a picture of yourself")).toBe("A photo of Sienna, right now, wherever she is.");
-    expect(prompt("send a pic of you please")).toBe("A photo of Sienna, right now, wherever she is.");
+    expect(prompt("send me a picture of yourself")).toBe("A photo of Sienna.");
+    expect(prompt("send a pic of you please")).toBe("A photo of Sienna.");
   });
 
   it("stops at the end of the sentence that asked", () => {

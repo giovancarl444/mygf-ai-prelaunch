@@ -119,8 +119,9 @@ export function composeMediaPrompt(input: { kind: ChatMediaKind; message: string
       .slice(0, 200);
   }
 
+  // Deliberately a seed, not a finished prompt. The provider expands this with
+  // its own model and already has the conversation through the room, so
+  // inventing scene detail here would only fight both.
   const subject = [before, phrase].filter(Boolean).join(" ");
-  return after
-    ? `A ${subject} of ${input.name} ${after}.`
-    : `A ${subject} of ${input.name}, right now, wherever she is.`;
+  return after ? `A ${subject} of ${input.name} ${after}.` : `A ${subject} of ${input.name}.`;
 }

@@ -115,6 +115,67 @@ describe("verified OhAPI request contract", () => {
   });
 
   /**
+   * Documented quality controls. `prompt_enhancement` has the provider expand
+   * the prompt with its own model, and `resolution` fixes the output shape
+   * rather than leaving it to an unknown default.
+   */
+  it("sends the documented quality fields when they are asked for", async () => {
+    respondWith({ job_id: "job-q" });
+    await requestOhApiImage({
+      characterId: "char-1",
+      roomId: "room-9",
+      prompt: "a portrait",
+      promptEnhancement: true,
+      resolution: "9:16",
+      userGender: "male",
+    });
+
+    expect(lastRequest().body).toEqual({
+      character_id: "char-1",
+      room_id: "room-9",
+      prompt: "a portrait",
+      prompt_enhancement: true,
+      resolution: "9:16",
+      user_gender: "male",
+    });
+  });
+
+  /**
+   * These fields are documented rather than observed, and this documentation
+   * has been wrong before. A rejection on shape must not cost the customer the
+   * photo they asked for.
+   */
+  it("retries without the tuning fields if the service rejects them", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ message: "unexpected field" }),
+    } as unknown as Response);
+    respondWith({ job_id: "job-fallback" });
+
+    const job = await requestOhApiImage({
+      characterId: "char-1",
+      prompt: "a portrait",
+      promptEnhancement: true,
+      resolution: "9:16",
+    });
+
+    expect(job.jobId).toBe("job-fallback");
+    expect(lastRequest().body).toEqual({ character_id: "char-1", prompt: "a portrait" });
+  });
+
+  it("does not retry when the request carried no tuning to drop", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ message: "moderation" }),
+    } as unknown as Response);
+
+    await expect(requestOhApiImage({ characterId: "char-1", prompt: "a portrait" })).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  /**
    * The documented `/api/v1/audio` does not exist — it answers 403 "Unknown
    * endpoint". `/api/v1/audio/notes` is the real path.
    */

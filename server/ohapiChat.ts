@@ -5,7 +5,7 @@ import { adultProcedure } from "./ohapiAccess";
 import { createOhApiRoom, generateOhApiText, requestOhApiAudio, requestOhApiImage, requestOhApiVideo } from "./ohapi";
 import { type ChatMediaKind, composeMediaPrompt, detectChatMediaRequest } from "./ohapiChatIntent";
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
-import { submitMediaJob } from "./ohapiMediaJobs";
+import { PHOTO_RESOLUTION, submitMediaJob, USE_PROMPT_ENHANCEMENT } from "./ohapiMediaJobs";
 import {
   clearOwnedOhapiRoom,
   consumeOhapiAllowance,
@@ -129,6 +129,7 @@ async function startRequestedMedia(input: {
   message: string;
   reply: string;
   name: string;
+  userGender: "male" | "female" | null;
 }) {
   // What she is asked is not what should be generated. The request is turned
   // into a description first; sending the message verbatim is how you get a
@@ -158,12 +159,19 @@ async function startRequestedMedia(input: {
           return requestOhApiVideo({
             characterId: input.providerCharacterId,
             prompt,
+            promptEnhancement: USE_PROMPT_ENHANCEMENT,
           });
         }
         return requestOhApiImage({
           characterId: input.providerCharacterId,
           roomId: input.providerRoomId,
           prompt,
+          promptEnhancement: USE_PROMPT_ENHANCEMENT,
+          resolution: PHOTO_RESOLUTION,
+          // Only sent when the room recorded one. Omitted, the provider
+          // defaults to the opposite of the character's gender, which is a
+          // better guess than any we would invent.
+          userGender: input.userGender ?? undefined,
         });
       },
     });
@@ -313,6 +321,7 @@ export const ohapiChatRouter = router({
           message: input.message,
           reply: reply.content,
           name: character.displayName.split(" ")[0] || character.displayName,
+          userGender: room.userGender ?? null,
         })
         : null;
 
