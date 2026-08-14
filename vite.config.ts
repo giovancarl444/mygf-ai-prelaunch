@@ -150,10 +150,25 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+/**
+ * Development tooling is kept out of the production bundle.
+ *
+ * `jsxLocPlugin` stamps every element with the source file and line it came
+ * from. That is useful while building and is a disclosure in production: it put
+ * 17 source paths and 554 `data-loc` attributes into the shipped bundle, which
+ * hands any visitor a map of the client source tree. The debug collector is a
+ * dev-server middleware and has nothing to do in a build either.
+ *
+ * `vitePluginManusRuntime` stays in both. The site is currently served from the
+ * Manus workspace and the platform expects it; removing it is part of moving
+ * off that host, not part of this.
+ */
+const plugins = (mode: string) => mode === "production"
+  ? [react(), tailwindcss(), vitePluginManusRuntime()]
+  : [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
-export default defineConfig({
-  plugins,
+export default defineConfig(({ mode }) => ({
+  plugins: plugins(mode),
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -184,4 +199,4 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
-});
+}));
