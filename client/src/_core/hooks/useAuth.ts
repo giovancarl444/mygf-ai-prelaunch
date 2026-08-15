@@ -1,4 +1,5 @@
 import { startLogin } from "@/const";
+import { isGuestOpenId } from "@shared/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
@@ -55,11 +56,17 @@ export function useAuth(options?: UseAuthOptions) {
       "manus-runtime-user-info",
       JSON.stringify(meQuery.data)
     );
+    // A guest is a real user row, so `Boolean(user)` is true for someone who
+    // has never signed up. Reading that as authenticated is what showed a
+    // visitor a "Sign out" button and hid the only action the funnel needs from
+    // them.
+    const isGuest = isGuestOpenId(meQuery.data?.openId);
     return {
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,
       error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      isGuest,
+      isAuthenticated: Boolean(meQuery.data) && !isGuest,
     };
   }, [
     meQuery.data,

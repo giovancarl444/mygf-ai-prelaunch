@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Request, Response } from "express";
+import { GUEST_OPEN_ID_PREFIX, isGuestOpenId } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import {
   countOwnedOhapiMediaJobs,
@@ -23,7 +24,6 @@ import {
  */
 
 export const GUEST_COOKIE = "mygf_guest";
-const GUEST_OPEN_ID_PREFIX = "guest:";
 
 /** What a visitor gets before being asked for anything. */
 export const GUEST_MESSAGE_LIMIT = 3;
@@ -38,7 +38,7 @@ export const GUEST_LIMIT_REACHED =
   "Create a free account to keep talking — your conversation is saved.";
 
 export function isGuestUser(user: { openId: string }) {
-  return user.openId.startsWith(GUEST_OPEN_ID_PREFIX);
+  return isGuestOpenId(user.openId);
 }
 
 /** Ninety days. Long enough that a visitor who comes back still has their thread. */

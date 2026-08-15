@@ -35,3 +35,22 @@ export const decodeOAuthState = (state: string): OAuthState => {
   }
   return { redirectUri: decoded };
 };
+
+/**
+ * What marks an identity as belonging to a visitor rather than an account.
+ *
+ * A guest is a real user row, distinguished only by this prefix — which is what
+ * keeps ownership, allowances, and the safety protocol from having to learn
+ * about a second kind of account. The consequence is that anything asking "is
+ * this person signed in?" gets `true` from the mere existence of a user unless
+ * it checks here, and the client did exactly that: a visitor was shown a
+ * "Sign out" button, told they had an account, and never offered the sign-up
+ * that the entire funnel depends on.
+ *
+ * Shared rather than duplicated because a second copy of this string on the
+ * client is a copy that can drift from the one that mints the identities.
+ */
+export const GUEST_OPEN_ID_PREFIX = "guest:";
+
+export const isGuestOpenId = (openId: string | null | undefined): boolean =>
+  typeof openId === "string" && openId.startsWith(GUEST_OPEN_ID_PREFIX);
