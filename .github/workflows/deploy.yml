@@ -68,11 +68,15 @@ jobs:
 
       # Only the built output and what is needed to install runtime
       # dependencies. Source, tests, and .env never leave the runner.
+      #
+      # `patches/` is not optional despite looking it: package.json declares a
+      # patched dependency, and pnpm refuses to install at all if the patch file
+      # named there is missing.
       - name: Upload the build
         run: |
           rsync -az --delete \
             -e "ssh -o BatchMode=yes" \
-            dist/ package.json pnpm-lock.yaml drizzle/ drizzle.config.ts \
+            dist/ package.json pnpm-lock.yaml drizzle/ patches/ \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/srv/mygf/incoming/"
 
       - name: Install, migrate, and restart
@@ -86,15 +90,16 @@ jobs:
             rm -rf current && mv incoming current
 
             cd current
-            # Not --prod: the schema migration runs here, and drizzle-kit is a
-            # development dependency. It has to run here rather than in CI
-            # because the database only accepts connections from this machine.
-            pnpm install --frozen-lockfile
+            pnpm install --prod --frozen-lockfile
 
             # Schema first. A server started against an older schema is the
             # failure this ordering exists to prevent.
+            #
+            # dist/migrate.js is bundled from scripts/migrate.ts and uses the
+            # migrator inside drizzle-orm, so the server needs no development
+            # dependencies and no TypeScript loader to apply a migration.
             set -a && . /srv/mygf/.env && set +a
-            pnpm exec drizzle-kit migrate
+            node dist/migrate.js
 
             sudo systemctl restart mygf
             sleep 3
