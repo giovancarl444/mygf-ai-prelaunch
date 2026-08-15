@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
+import SignIn from "@/pages/SignIn";
 import { useEffect } from "react";
 import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -17,7 +18,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/companions" component={Companions} />
       <Route path="/companion/:slug" component={Companion} />
-      <Route path="/chat" component={Chat} />
+      <Route path="/signin" component={SignIn} />
+        <Route path="/chat" component={Chat} />
       <Route path="/chat/:slug" component={Chat} />
       <Route path="/ops/ohapi" component={OhapiStudio} />
       {/* The technical pilot is gone; anyone holding an old link lands on the catalog. */}

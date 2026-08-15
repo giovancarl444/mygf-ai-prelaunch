@@ -49,6 +49,8 @@ OHAPI_API_KEY='...' node scripts/ohapi-probe.mjs --image  # costs credit
 | `server/ohapiCompanions.ts` | Public catalog. Degrades to empty rather than failing the page. |
 | `server/ohapiStudio.ts` | Owner-only operations at `/ops/ohapi`. |
 | `server/ohapiAccess.ts` | Server-enforced adult confirmation. |
+| `server/auth.ts` | Sign-in links. Ours, not a provider's. |
+| `server/email.ts` | The one message this product sends. |
 | `server/ohapiGuest.ts` | Visitors who have not signed up yet. Three messages, one generation. |
 | `server/seo.ts` | Per-route metadata, `robots.txt`, `sitemap.xml`. Mounted before the SPA catch-all. |
 | `server/ohapiCrisis.ts` | Self-harm interrupt. Over-triggers on purpose — read the header before touching it. |

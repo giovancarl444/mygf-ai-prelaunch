@@ -44,8 +44,10 @@ jobs:
       # read at runtime from the server's own environment file.
       - name: Build
         env:
+          # Sign-in no longer redirects to an identity provider, so the portal
+          # URL is gone from the build. The app id is only stamped into the
+          # session JWT and checked for presence.
           VITE_APP_ID: ${{ secrets.VITE_APP_ID }}
-          VITE_OAUTH_PORTAL_URL: ${{ secrets.VITE_OAUTH_PORTAL_URL }}
         run: |
           set -o pipefail
           pnpm build 2>&1 | tee build.log

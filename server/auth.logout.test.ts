@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
+import { GUEST_COOKIE } from "./ohapiGuest";
 import type { TrpcContext } from "./_core/context";
 
 type CookieCall = {
@@ -47,16 +48,29 @@ describe("auth.logout", () => {
     const caller = appRouter.createCaller(ctx);
 
     const result = await caller.auth.logout();
+    const session = clearedCookies.find(cookie => cookie.name === COOKIE_NAME);
 
     expect(result).toEqual({ success: true });
-    expect(clearedCookies).toHaveLength(1);
-    expect(clearedCookies[0]?.name).toBe(COOKIE_NAME);
-    expect(clearedCookies[0]?.options).toMatchObject({
+    expect(session?.options).toMatchObject({
       maxAge: -1,
       secure: true,
       sameSite: "none",
       httpOnly: true,
       path: "/",
     });
+  });
+
+  /**
+   * Signing out has to end both identities. Leaving the guest cookie behind
+   * would drop the customer straight back into a guest session on the same
+   * browser, which on a shared machine is the last thing signing out should do.
+   */
+  it("ends the guest identity as well as the account session", async () => {
+    const { ctx, clearedCookies } = createAuthContext();
+    await appRouter.createCaller(ctx).auth.logout();
+
+    expect(clearedCookies.map(cookie => cookie.name)).toEqual(
+      expect.arrayContaining([COOKIE_NAME, GUEST_COOKIE]),
+    );
   });
 });

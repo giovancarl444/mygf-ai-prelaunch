@@ -52,7 +52,7 @@ Then write `/srv/mygf/.env` from `.env.example`, and add the CI public key to
 | `DEPLOY_SSH_KEY` | Private half of the CI deploy key |
 | `DEPLOY_KNOWN_HOSTS` | `ssh-keyscan <droplet>` — pinned, so a changed host key fails the deploy |
 | `PUBLIC_BASE_URL` | Used only for the post-deploy check |
-| `VITE_APP_ID`, `VITE_OAUTH_PORTAL_URL` | Read at build time and baked into the bundle |
+| `VITE_APP_ID` | Read at build time and baked into the bundle. Any non-empty string. |
 
 ## Moving the data off Manus
 
@@ -89,9 +89,19 @@ ssh deploy@<droplet> 'cd /srv/mygf && rm -rf current && cp -a previous current &
 A schema migration is not rolled back by this. If a release migrated, roll
 forward instead.
 
-## What is still bound to Manus
+## Sign-in
 
-`VITE_APP_ID`, `VITE_OAUTH_PORTAL_URL`, and `OAUTH_SERVER_URL` are the login
-system. Moving the hosting does not move those, and when that account goes away
-nobody can sign in. Self-hosted sessions are the remaining piece of this
-migration, and the one with a date attached.
+Sign-in is ours: `POST auth.requestLink` emails a one-time link,
+`GET /api/auth/verify` exchanges it for the same session cookie the app already
+used. Set `EMAIL_PROVIDER`, `EMAIL_API_KEY`, and `EMAIL_FROM`, and verify the
+sending domain with the provider before launch — an unverified domain is how a
+sign-in link ends up in spam, which reads to the customer as a broken product.
+
+`PUBLIC_BASE_URL` matters here beyond SEO: it is the origin written into the
+link. Unset, links follow the request host, which is wrong the moment anything
+sits in front of the app.
+
+The old identity provider's callback is still mounted so accounts created
+through it keep working. Those accounts are matched **by email address** on
+their first link sign-in, so nobody is orphaned. Once nobody signs in that way,
+`registerOAuthRoutes`, `VITE_OAUTH_PORTAL_URL`, and `OAUTH_SERVER_URL` can go.

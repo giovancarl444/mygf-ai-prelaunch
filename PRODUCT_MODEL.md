@@ -20,6 +20,7 @@ studio where it belongs.
 | `/companion/:slug` | Public | One companion's profile, and the entry point to her chat. |
 | `/chat` | Signed in | Your conversations. |
 | `/chat/:slug` | Adult confirmed | The conversation. Photos, voice notes, and video are asked for in it and arrive in it. An account is asked for after three messages, not before the first. |
+| `/signin` | Public | Email a sign-in link. No password. |
 | `/ops/ohapi` | Owner only | Operational studio: sync, curate, create. Not linked from the customer product. |
 | `/pilot` | — | Removed. Redirects to `/companions`. |
 
@@ -97,6 +98,32 @@ the cheapest realism available.
 It is a per-conversation choice, changeable from the chat header and applied by
 the provider from her next reply. `default` and `long-form` remain available for
 anyone who wants the longer register.
+
+## Signing in
+
+A link to an email address, issued and verified by this server. No password to
+store, leak, reset, or have reused from somewhere the customer signed up years
+ago — on an adult product, this is usually the account someone least wants
+breached.
+
+The session was never the dependency: it is an HS256 JWT signed with our own
+`JWT_SECRET` and verified locally. Only the step that established *who* someone
+is ran through the hosting platform's identity provider, and that is the step
+replaced. Losing that platform no longer means losing every account.
+
+Three things the flow does deliberately:
+
+- **Answers identically for a known and an unknown address.** Anything else
+  makes it a membership oracle, which on this product is a disclosure about a
+  real person.
+- **Stores only a hash of the token.** Reading the table is not a login.
+- **Binds the link to the browser that asked for it.** Email security scanners
+  follow links; without the nonce cookie they would spend a single-use token
+  before the customer clicked. A request from anywhere else is redirected to
+  ask again rather than consuming it.
+
+Accounts created through the old provider are matched **by email address**, so
+switching how people sign in does not orphan their conversations.
 
 ## Talk first, sign up to keep it
 

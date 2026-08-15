@@ -37,6 +37,30 @@ export const betaInterests = mysqlTable("beta_interests", {
  * and expires after an hour, so it is a diagnostic record, not what the public
  * catalog serves — see `getOhApiPortraits`.
  */
+/**
+ * Sign-in links, stored as hashes.
+ *
+ * The token in the customer's email is the only copy; what is kept here cannot
+ * be used to sign in as them, so a database read is not a login. Rows are
+ * single-use and short-lived, and `requestedIp` exists to bound how fast one
+ * source can mint them.
+ */
+export const authLoginTokens = mysqlTable("auth_login_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  email: varchar("email", { length: 320 }).notNull(),
+  // Binds the link to the browser that asked for it, so an email scanner
+  // following the link cannot burn it before the customer clicks.
+  requestNonce: varchar("requestNonce", { length: 64 }).notNull(),
+  requestedIp: varchar("requestedIp", { length: 64 }),
+  expiresAt: timestamp("expiresAt").notNull(),
+  consumedAt: timestamp("consumedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  emailCreatedIndex: index("auth_login_tokens_email_created_index").on(table.email, table.createdAt),
+  expiresIndex: index("auth_login_tokens_expires_index").on(table.expiresAt),
+}));
+
 export const ohapiCharacters = mysqlTable("ohapi_characters", {
   id: int("id").autoincrement().primaryKey(),
   worldSlug: varchar("worldSlug", { length: 120 }).notNull().unique(),
@@ -154,6 +178,8 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type BetaInterest = typeof betaInterests.$inferSelect;
 export type InsertBetaInterest = typeof betaInterests.$inferInsert;
+export type AuthLoginToken = typeof authLoginTokens.$inferSelect;
+export type InsertAuthLoginToken = typeof authLoginTokens.$inferInsert;
 export type OhapiCharacter = typeof ohapiCharacters.$inferSelect;
 export type InsertOhapiCharacter = typeof ohapiCharacters.$inferInsert;
 export type OhapiRoom = typeof ohapiRooms.$inferSelect;

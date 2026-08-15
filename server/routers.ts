@@ -6,6 +6,8 @@ import { ohapiChatRouter } from "./ohapiChat";
 import { ohapiCompanionsRouter } from "./ohapiCompanions";
 import { ohapiMediaRouter } from "./ohapiMedia";
 import { ohapiStudioRouter } from "./ohapiStudio";
+import { clearGuestSession } from "./ohapiGuest";
+import { requestLoginLink } from "./auth";
 
 export const appRouter = router({
   system: systemRouter,
@@ -14,8 +16,12 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      clearGuestSession(ctx.res, ctx.req);
       return { success: true } as const;
     }),
+    // Sign-in we issue ourselves, rather than through an identity provider on
+    // a platform this product is leaving.
+    requestLink: requestLoginLink,
   }),
   // Public discovery: every listed companion is one the provider can actually open.
   companions: ohapiCompanionsRouter,
