@@ -103,8 +103,13 @@ jobs:
             # dist/migrate.js is bundled from scripts/migrate.ts and uses the
             # migrator inside drizzle-orm, so the server needs no development
             # dependencies and no TypeScript loader to apply a migration.
-            set -a && . /srv/mygf/.env && set +a
-            node dist/migrate.js
+            #
+            # It reads the environment file itself rather than being handed it
+            # by `set -a && . /srv/mygf/.env`. The service reads that file
+            # through systemd and dotenv, which expand nothing, and bash does —
+            # so a password containing a `$` or a backquote would have meant the
+            # migration and the server disagreeing about the credential.
+            ENV_FILE=/srv/mygf/.env node dist/migrate.js
 
             sudo systemctl restart mygf
             sleep 3

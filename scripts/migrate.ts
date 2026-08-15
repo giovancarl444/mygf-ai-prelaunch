@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import { describeConnectionFailure, parseDatabaseUrl } from "../server/databaseUrl";
+import { applyEnvFile } from "../server/envFile";
 
 /**
  * Applies pending migrations, on the machine that can reach the database.
@@ -17,9 +18,17 @@ import { describeConnectionFailure, parseDatabaseUrl } from "../server/databaseU
  * rule and not something to work around.
  */
 
+/**
+ * Read directly rather than through the shell. The service gets this same file
+ * from systemd and dotenv, neither of which expands anything; sourcing it in
+ * bash instead would rewrite any password containing a `$` or a backquote and
+ * then fail with an "access denied" that blames the credential.
+ */
+applyEnvFile(process.env.ENV_FILE ?? "/srv/mygf/.env");
+
 const url = process.env.DATABASE_URL;
 if (!url) {
-  console.error("DATABASE_URL is not set. Nothing was applied.");
+  console.error("DATABASE_URL is not set, and none was found in ENV_FILE. Nothing was applied.");
   process.exit(1);
 }
 
