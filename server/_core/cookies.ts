@@ -39,10 +39,19 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  // `SameSite=None` was required while this ran inside the hosting platform's
+  // preview iframe, which made every request cross-site. On its own domain that
+  // is both unnecessary and worse: `None` opts out of the browser's built-in
+  // CSRF protection, and a browser drops a `None` cookie entirely unless it is
+  // also `Secure` — so the first deploy behind plain HTTP would have set no
+  // session cookie at all and nobody could have signed in.
+  //
+  // `Lax` is correct for a first-party application and still sends the cookie
+  // on the top-level navigation an emailed sign-in link produces.
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    sameSite: "lax",
     secure: isSecureRequest(req),
   };
 }

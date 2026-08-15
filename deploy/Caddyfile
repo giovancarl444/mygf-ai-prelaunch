@@ -1,7 +1,14 @@
 # /etc/caddy/Caddyfile
 #
 # TLS is issued and renewed automatically, which is the entire reason Caddy is
-# here rather than nginx. Replace the hostname once the domain is registered.
+# here rather than nginx.
+#
+# No domain yet? Use `<droplet-ip-with-dashes>.sslip.io` — it resolves to the
+# address in the name, so a real certificate is issued with nothing to
+# register. That is enough to deploy and test everything today, and the only
+# change when the real domain lands is this line and PUBLIC_BASE_URL.
+#
+#   203-0-113-9.sslip.io {
 
 mygf.example.com {
 	encode zstd gzip
