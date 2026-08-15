@@ -74,9 +74,14 @@ jobs:
       # named there is missing.
       - name: Upload the build
         run: |
+          # No trailing slashes on the directories. `rsync dist/ dest/` copies
+          # the *contents* of dist into dest, which flattens every source into
+          # one directory — dist/index.js would arrive as incoming/index.js and
+          # the patch would land outside patches/. Without the slash, each
+          # directory is copied as itself.
           rsync -az --delete \
             -e "ssh -o BatchMode=yes" \
-            dist/ package.json pnpm-lock.yaml drizzle/ patches/ \
+            dist drizzle patches package.json pnpm-lock.yaml \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/srv/mygf/incoming/"
 
       - name: Install, migrate, and restart
