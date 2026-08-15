@@ -122,6 +122,29 @@ said something serious and software flirted back. It is a fixed English word
 list and therefore a floor, not a ceiling — it will miss indirect phrasing and
 other languages, and it must never be described as sufficient on its own.
 
+## What search sees
+
+The client is a single-page app, so every route returned the same HTML shell:
+one title and one description for the whole site, and `/robots.txt` and
+`/sitemap.xml` answered with that shell at `200 text/html` because the catch-all
+matched them too. For a product whose growth is meant to come from search, that
+is the difference between having pages and having one page.
+
+`server/seo.ts` rewrites the head of the shell per route before it is sent —
+title, description, canonical, Open Graph, and JSON-LD — and serves a real
+`robots.txt` and a `sitemap.xml` built from the published catalog. It is not
+server-side rendering and does not try to be; the body still hydrates in the
+browser exactly as before.
+
+Two rules it enforces:
+
+- **Only the public surface is indexable.** Conversations, the studio, and
+  anything unrecognised are `noindex` by default. A customer's thread appearing
+  in search results would be a serious privacy failure.
+- **The origin is resolved, never hard-coded.** `PUBLIC_BASE_URL` when set,
+  otherwise the host that served the request — so canonicals stay correct
+  through a domain change instead of pointing at a hostname the site has left.
+
 ## Limits
 
 Per account, per UTC hour: 60 messages, 12 media generations, 12 new rooms, and a

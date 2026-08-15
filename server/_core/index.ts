@@ -7,6 +7,8 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { registerSeoRoutes } from "../seo";
+import path from "path";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -42,8 +44,18 @@ async function startServer() {
       createContext,
     })
   );
+  // What a crawler sees. Mounted before the single-page handlers, which
+  // otherwise answer every path — including /robots.txt — with the HTML shell.
+  const isDevelopment = process.env.NODE_ENV === "development";
+  registerSeoRoutes(app, {
+    enabled: !isDevelopment,
+    distPath: isDevelopment
+      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
+      : path.resolve(import.meta.dirname, "public"),
+  });
+
   // development mode uses Vite, production mode uses static files
-  if (process.env.NODE_ENV === "development") {
+  if (isDevelopment) {
     await setupVite(app, server);
   } else {
     serveStatic(app);
