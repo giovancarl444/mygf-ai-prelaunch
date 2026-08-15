@@ -74,6 +74,12 @@ else
     mysql://*) ;;
     *) fail "That does not look like a MySQL connection string — it should start with mysql://" ;;
   esac
+  case "$DATABASE_URL_INPUT" in
+    *ssl-mode=*|*sslmode=*) ;;
+    *) note "Note: no ssl-mode in that string. Managed databases usually require"
+       note "      TLS — if the connection is refused, check you copied the VPC"
+       note "      connection string rather than assembling one by hand." ;;
+  esac
 fi
 
 # ---------------------------------------------------------------------------
@@ -160,6 +166,10 @@ PORT=3000
 PUBLIC_BASE_URL=$BASE_URL
 
 DATABASE_URL=$DATABASE_URL_INPUT
+# Set only if the database certificate is not publicly trusted. A PEM, or a
+# path to one.
+DATABASE_CA_CERT=
+
 OHAPI_API_KEY=$OHAPI_KEY_INPUT
 JWT_SECRET=$JWT_SECRET_VALUE
 

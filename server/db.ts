@@ -5,15 +5,22 @@ import {
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { describeConnectionFailure, parseDatabaseUrl } from "./databaseUrl";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      // Managed providers require TLS and advertise it with a parameter mysql2
+      // does not read. Translated here so the connection is encrypted rather
+      // than refused.
+      const connection = parseDatabaseUrl(process.env.DATABASE_URL);
+      _db = connection.ssl
+        ? drizzle({ connection: { uri: connection.uri, ssl: connection.ssl } })
+        : drizzle(connection.uri);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn("[Database] Failed to connect:", describeConnectionFailure(error));
       _db = null;
     }
   }
