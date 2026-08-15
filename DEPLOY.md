@@ -74,8 +74,15 @@ It finishes by printing the six repository secrets to paste into
 *Settings → Secrets and variables → Actions*. After that, deploying is
 `git push origin main`.
 
-Safe to run again — every step checks before it acts, and an existing `.env` is
-left alone.
+Safe to run again — every step checks before it acts, an existing `.env` keeps
+its contents, and its ownership is repaired each time.
+
+`/srv/mygf/.env` is owned `root:deploy`, mode 640. The group is the deploy user
+rather than the application user, which looks backwards and is not: systemd
+reads `EnvironmentFile` as root and injects the variables, so the service never
+opens the file, while the deploy does in order to apply migrations. The
+application having read access to its own secrets would widen what a compromise
+of it reaches, for no benefit.
 
 ### No domain yet
 

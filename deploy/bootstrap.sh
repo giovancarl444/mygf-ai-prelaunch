@@ -191,10 +191,20 @@ EMAIL_API_KEY=
 EMAIL_FROM=
 ENV
   umask 022
-  chown root:"$APP_USER" "$ENV_FILE"
-  chmod 640 "$ENV_FILE"
-  note "$ENV_FILE written, readable only by root and the service"
+  note "$ENV_FILE written"
 fi
+
+# Ownership is repaired on every run, not only when the file is created, so a
+# box set up before this was corrected is fixed by running the script again.
+#
+# The group is the deploy user rather than the application user, which looks
+# backwards and is not: systemd reads EnvironmentFile as root and injects the
+# variables, so the service never opens this file. The deploy does, to apply
+# migrations. Giving the application read access to its own secrets file would
+# widen what a compromise of it reaches for nothing.
+chown root:"$DEPLOY_USER" "$ENV_FILE"
+chmod 640 "$ENV_FILE"
+note "$ENV_FILE readable by root and $DEPLOY_USER only"
 
 # Written out rather than fetched, so this script needs nothing but itself.
 # Kept identical to deploy/mygf.service in the repository.
