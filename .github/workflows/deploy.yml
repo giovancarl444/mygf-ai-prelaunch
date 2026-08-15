@@ -86,7 +86,10 @@ jobs:
             rm -rf current && mv incoming current
 
             cd current
-            pnpm install --prod --frozen-lockfile
+            # Not --prod: the schema migration runs here, and drizzle-kit is a
+            # development dependency. It has to run here rather than in CI
+            # because the database only accepts connections from this machine.
+            pnpm install --frozen-lockfile
 
             # Schema first. A server started against an older schema is the
             # failure this ordering exists to prevent.

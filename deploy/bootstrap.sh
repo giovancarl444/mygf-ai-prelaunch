@@ -270,7 +270,26 @@ note "$(ufw status | head -1)"
 
 say "Starting"
 systemctl daemon-reload
-systemctl enable --now caddy >/dev/null 2>&1 || systemctl restart caddy
+
+# `enable --now` is a no-op on a service apt has already started, which would
+# leave Caddy serving its default configuration and issuing no certificate for
+# our hostname. Validate, then restart unconditionally.
+if ! caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
+  fail "The Caddy configuration is not valid. Nothing was restarted."
+fi
+systemctl enable caddy >/dev/null 2>&1 || true
+systemctl restart caddy
+note "Caddy restarted with our configuration"
+
+# The certificate is fetched on first request and takes a few seconds. Nudge it
+# so the operator is not left wondering whether it worked.
+sleep 3
+if curl -fsS --max-time 20 "https://$HOSTNAME_FOR_TLS" -o /dev/null 2>/dev/null; then
+  note "Certificate issued — HTTPS is answering"
+else
+  note "Certificate not issued yet. It arrives within a minute of the first"
+  note "request; check with: journalctl -u caddy -n 30"
+fi
 systemctl enable mygf >/dev/null 2>&1 || true
 # The service will not stay up until a release exists; the first deploy starts
 # it for real. Failing here is expected and not worth alarming anyone about.
