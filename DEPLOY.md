@@ -92,6 +92,31 @@ for a domain nobody had to register, so deployment does not wait on the brand
 decision. When the real domain arrives, two things change: the hostname in
 `/etc/caddy/Caddyfile`, and `PUBLIC_BASE_URL` in `/srv/mygf/.env`.
 
+### The database certificate
+
+DigitalOcean signs managed-database certificates with its own authority, which
+is not in any system trust store. The connection is therefore refused with
+`HANDSHAKE_SSL_ERROR: self-signed certificate in certificate chain` — which is
+the code working, not failing: verification is never disabled, so the authority
+has to be supplied.
+
+Download it from the database's **Overview → Connection Details → Download CA
+certificate**, then:
+
+```bash
+scp ca-certificate.crt root@<droplet-ip>:/srv/mygf/
+ssh root@<droplet-ip> 'chmod 644 /srv/mygf/ca-certificate.crt'
+# then set in /srv/mygf/.env:
+#   DATABASE_CA_CERT=/srv/mygf/ca-certificate.crt
+```
+
+Mode 644 is deliberate. A certificate authority is public information, and both
+the application user and the deploy user have to read it.
+
+Download it from the control panel rather than capturing it from the connection
+itself. Trusting a certificate obtained from the very connection being verified
+proves nothing about that connection.
+
 ## The repository secrets CI needs
 
 | Secret | What |

@@ -78,6 +78,15 @@ else
     mysql://*) ;;
     *) fail "That does not look like a MySQL connection string — it should start with mysql://" ;;
   esac
+  # DigitalOcean signs database certificates with its own authority, so the
+  # first connection fails until that authority is supplied. Said here rather
+  # than discovered later from an opaque handshake error.
+  if [ ! -f "$APP_ROOT/ca-certificate.crt" ]; then
+    note "After this finishes, if the database refuses the connection with"
+    note "\"self-signed certificate in certificate chain\", download the CA from"
+    note "the database Overview page, copy it to $APP_ROOT/ca-certificate.crt,"
+    note "chmod 644 it, and set DATABASE_CA_CERT to that path in $ENV_FILE."
+  fi
   case "$DATABASE_URL_INPUT" in
     *ssl-mode=*|*sslmode=*) ;;
     *) note "Note: no ssl-mode in that string. Managed databases usually require"
@@ -170,9 +179,11 @@ PORT=3000
 PUBLIC_BASE_URL=$BASE_URL
 
 DATABASE_URL=$DATABASE_URL_INPUT
-# Set only if the database certificate is not publicly trusted. A PEM, or a
-# path to one.
-DATABASE_CA_CERT=
+# DigitalOcean's database certificates are signed by its own authority, so this
+# is required rather than optional there. Download it from the database Overview
+# page, put it beside this file, and chmod 644 — a CA is public, and both the
+# application and the deploy have to read it.
+DATABASE_CA_CERT=$([ -f "$APP_ROOT/ca-certificate.crt" ] && echo "$APP_ROOT/ca-certificate.crt")
 
 OHAPI_API_KEY=$OHAPI_KEY_INPUT
 JWT_SECRET=$JWT_SECRET_VALUE
