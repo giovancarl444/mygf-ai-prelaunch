@@ -4,9 +4,9 @@ Adult AI companion product. Companions, conversation, and generated photo, voice
 and video come from the OhAPI provider. Node + Express + tRPC + Drizzle (MySQL)
 on the server, React + wouter on the client.
 
-**Read `CONTRIBUTING.md` first.** It defines the branch rules and the ownership
-split with Manus, which owns the visual design. Do not edit `client/src/**`
-styling or markup without checking it.
+**Read `CONTRIBUTING.md` first.** It defines the branch rules. The design
+ownership split with Manus ended on 15 August 2026 — this is now a single-agent
+repository and the frontend is yours too.
 
 ## The one thing to know before touching the provider
 

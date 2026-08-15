@@ -1,8 +1,14 @@
 # Working on MyGF.ai
 
-Two systems build this repository: **Manus** owns how it looks, **Claude** owns
-how it works. That split only holds if both follow the rules below, because two
-agents pushing to the same branch will silently overwrite each other.
+**As of 15 August 2026 this is a single-agent repository.** Manus previously
+owned the visual design under the split described below; that arrangement has
+ended, and Claude now owns the whole thing — appearance included.
+
+The ownership table is kept because the reasoning in it still applies the moment
+a second contributor arrives, and because the rules it encodes (never change
+which data a page requests as a side effect of restyling it; never add a script
+tag to `index.html` without reading the forbidden list) are good rules
+regardless of who is holding the pen.
 
 ## Branch rules
 
@@ -22,10 +28,10 @@ downstream of it.
 
 | Path | Owner | Rule |
 | --- | --- | --- |
-| `client/src/index.css`, `client/src/pages/*.css` | **Manus** | Free rein on visual design. |
-| `client/src/components/**` (presentation) | **Manus** | Layout and styling; keep the props each component receives. |
-| `client/src/pages/**` (markup and copy) | **Manus** | Change structure and wording freely. Do **not** change which data is requested. |
-| `client/index.html` | **Manus** | See the forbidden list below before adding a script tag. |
+| `client/src/index.css`, `client/src/pages/*.css` | Claude *(was Manus)* | Free rein on visual design. |
+| `client/src/components/**` (presentation) | Claude *(was Manus)* | Layout and styling; keep the props each component receives. |
+| `client/src/pages/**` (markup and copy) | Claude *(was Manus)* | Change structure and wording freely. Changing **which data is requested** is a server-side decision, not a styling one. |
+| `client/index.html` | Claude *(was Manus)* | See the forbidden list below before adding a script tag. |
 | `server/**` | **Claude** | Provider integration, authorization, rate limits, data access. |
 | `drizzle/**` | **Claude** | Schema and migrations. |
 | `scripts/**` | **Claude** | Diagnostics. |
