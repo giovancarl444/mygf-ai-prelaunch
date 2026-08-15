@@ -371,3 +371,98 @@ describe("media asked for in conversation", () => {
     expect(store.refund).not.toHaveBeenCalledWith(7, "media");
   });
 });
+
+/**
+ * The interruption has to happen before the money and before the provider.
+ * Charging someone for the moment they disclosed self-harm, or generating a
+ * flirty reply to it, are both unacceptable outcomes and both are prevented by
+ * where this check sits rather than by what it says.
+ */
+describe("the safety protocol", () => {
+  it("never sends a crisis message to the provider", async () => {
+    await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "i don't want to be alive anymore",
+    });
+
+    expect(provider.generateText).not.toHaveBeenCalled();
+    expect(provider.createRoom).not.toHaveBeenCalled();
+    expect(provider.requestImage).not.toHaveBeenCalled();
+  });
+
+  it("does not charge for it", async () => {
+    await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "i want to kill myself",
+    });
+
+    expect(calls).not.toContain("consumeAllowance");
+    expect(calls).not.toContain("consumeMediaAllowance");
+  });
+
+  it("answers as the product, not as the companion", async () => {
+    const result = await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "i want to kill myself",
+    });
+
+    expect(result.crisis).toBe(true);
+    expect(result.content).toContain("not your companion");
+    expect(result.content).toContain("988");
+    expect(result.resources).toBeTruthy();
+  });
+
+  /**
+   * A request for a photo in the same breath must not be honoured. Nothing
+   * about that message is a normal request.
+   */
+  it("starts no generation even when the message also asks for one", async () => {
+    await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "send me a photo before i kill myself",
+    });
+
+    expect(provider.requestImage).not.toHaveBeenCalled();
+    expect(store.createMediaJob).not.toHaveBeenCalled();
+  });
+
+  it("keeps the exchange in the thread when a conversation already exists", async () => {
+    state.existingRoom = { id: 501, providerRoomId: "room-abc", ohapiCharacterId: 11 };
+    await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "i have been cutting myself",
+    });
+
+    expect(store.createMessage).toHaveBeenNthCalledWith(1, {
+      roomId: 501,
+      role: "user",
+      content: "i have been cutting myself",
+    });
+    expect(store.createMessage).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      roomId: 501,
+      role: "assistant",
+    }));
+  });
+
+  it("opens no room for someone who has never spoken to her", async () => {
+    state.existingRoom = undefined;
+    const result = await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "i want to die",
+    });
+
+    expect(provider.createRoom).not.toHaveBeenCalled();
+    expect(store.createMessage).not.toHaveBeenCalled();
+    expect(result.crisis).toBe(true);
+  });
+
+  it("leaves ordinary conversation alone", async () => {
+    const result = await memberCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "this week is killing me but i'm dying to see you",
+    });
+
+    expect(result.crisis).toBe(false);
+    expect(provider.generateText).toHaveBeenCalled();
+  });
+});

@@ -49,6 +49,7 @@ OHAPI_API_KEY='...' node scripts/ohapi-probe.mjs --image  # costs credit
 | `server/ohapiCompanions.ts` | Public catalog. Degrades to empty rather than failing the page. |
 | `server/ohapiStudio.ts` | Owner-only operations at `/ops/ohapi`. |
 | `server/ohapiAccess.ts` | Server-enforced adult confirmation. |
+| `server/ohapiCrisis.ts` | Self-harm interrupt. Over-triggers on purpose — read the header before touching it. |
 | `drizzle/schema.ts` | Schema. Migrations are generated, never hand-written. |
 
 ## Non-negotiables
@@ -57,6 +58,8 @@ OHAPI_API_KEY='...' node scripts/ohapi-probe.mjs --image  # costs credit
   user-facing error.
 - No generic provider proxy. Only reviewed, typed operations.
 - Adult confirmation is enforced server-side on every generative call.
+- A message that reads as self-harm never reaches the provider and is never
+  charged for. The companion does not answer it; the product does.
 - Allowances are charged before provider-side resources exist.
 - Provider error text never reaches the customer — `server/ohapiErrors.ts` maps
   status classes to safe copy.

@@ -889,6 +889,44 @@ p {
   color: #fff;
 }
 
+/* The safety protocol speaking. Deliberately not styled like her messages. */
+.chat-crisis {
+  margin: 0 16px 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--accent-2);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+}
+
+.chat-crisis p {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.chat-crisis-lede {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text) !important;
+  font-weight: 700;
+}
+
+.chat-crisis ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.9;
+}
+
+.chat-crisis-foot {
+  margin-bottom: 0 !important;
+  color: var(--text-dim) !important;
+  font-size: 12.5px !important;
+}
+
 /* The reply register for one conversation. */
 .chat-style-select {
   max-width: 150px;

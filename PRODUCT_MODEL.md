@@ -98,6 +98,30 @@ It is a per-conversation choice, changeable from the chat header and applied by
 the provider from her next reply. `default` and `long-form` remain available for
 anyone who wants the longer register.
 
+## The safety protocol
+
+Some messages are not conversation. If a customer says something that reads as
+suicidal ideation or self-harm, `chat.send` stops before the allowance is
+charged and before the provider is called at all, so the reply is never
+generated.
+
+What comes back is the product speaking, not the companion. Having her answer
+in character would be the worst option available: a piece of software the
+customer is paying to feel close to, presenting itself as competent to help.
+MyGF.ai says who it is instead and points to 988, the Samaritans, and
+findahelpline.com.
+
+The exchange stays in the thread — someone who said that and watched it vanish
+would reasonably read it as rejection — and an automatic safety report is filed
+for review.
+
+`server/ohapiCrisis.ts` holds the vocabulary. **Its bias is the opposite of the
+media detector's**: that one under-triggers because a false positive spends the
+customer's money, this one over-triggers because a false negative means a person
+said something serious and software flirted back. It is a fixed English word
+list and therefore a floor, not a ceiling — it will miss indirect phrasing and
+other languages, and it must never be described as sufficient on its own.
+
 ## Limits
 
 Per account, per UTC hour: 60 messages, 12 media generations, 12 new rooms, and a

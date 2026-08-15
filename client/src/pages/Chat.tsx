@@ -578,6 +578,32 @@ export default function Chat() {
                 </p>
               )}
 
+              {/* The safety protocol interrupted. Shown as the product
+                  speaking, never as the companion, and never dismissible
+                  into nothing — the numbers stay in the transcript too. */}
+              {send.data?.crisis && send.data.resources && (
+                <aside className="chat-crisis" role="alert">
+                  <p className="chat-crisis-lede">
+                    <ShieldCheck size={16} />
+                    This is MyGF.ai, not your companion.
+                  </p>
+                  <p>
+                    What you just said matters more than anything happening in this chat.
+                    Please talk to someone who can actually help.
+                  </p>
+                  <ul>
+                    {send.data.resources.map(resource => (
+                      <li key={resource.where}>
+                        <strong>{resource.where}</strong> — {resource.contact}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="chat-crisis-foot">
+                    If you are in immediate danger, call your local emergency number.
+                  </p>
+                </aside>
+              )}
+
               {/* Temporary owner-only diagnostic. The provider returns a
                   `tool_call` alongside the reply, and a request for a photo
                   produces a reply that ignores it — so the intent is expressed

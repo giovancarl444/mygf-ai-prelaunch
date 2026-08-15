@@ -12,6 +12,7 @@ import {
   setOhApiRoomTextingStyle,
 } from "./ohapi";
 import { type ChatMediaKind, composeMediaPrompt, detectChatMediaRequest } from "./ohapiChatIntent";
+import { CRISIS_RESOURCES, CRISIS_RESPONSE, detectCrisisLanguage } from "./ohapiCrisis";
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import { randomUUID } from "node:crypto";
 import { PHOTO_RESOLUTION, submitMediaJob, USE_PROMPT_ENHANCEMENT } from "./ohapiMediaJobs";
@@ -316,6 +317,43 @@ export const ohapiChatRouter = router({
   })).mutation(async ({ ctx, input }) => {
     const character = await requireCompanion(input.worldSlug);
 
+    // Before anything else, and before the customer is charged for it. A
+    // companion answering a disclosure of self-harm in character is the worst
+    // thing this product can do, so that reply is never generated: no
+    // allowance, no provider call, no room opened on the way.
+    if (detectCrisisLanguage(input.message)) {
+      const room = await getOwnedOhapiRoom({ userId: ctx.user.id, ohapiCharacterId: character.id });
+
+      if (room) {
+        // Kept in the thread rather than erased. Someone who said this and
+        // then watched it vanish would reasonably read that as rejection, and
+        // the resources need to still be there tomorrow.
+        await createOhapiMessage({ roomId: room.id, role: "user", content: input.message });
+        await createOhapiMessage({ roomId: room.id, role: "assistant", content: CRISIS_RESPONSE });
+        await createOhapiReport({
+          userId: ctx.user.id,
+          roomId: room.id,
+          reason: "safety",
+          detail: "Automatic: the safety protocol interrupted this conversation.",
+        }).catch(error => console.error("[Chat] The safety interruption could not be filed for review:", error));
+      }
+
+      // Deliberately without the account id or any of what was written. That
+      // this fired is operationally useful; the contents are not ours to put
+      // in a log file.
+      console.warn("[Chat] The safety protocol interrupted a conversation.");
+
+      return {
+        content: CRISIS_RESPONSE,
+        crisis: true as const,
+        resources: CRISIS_RESOURCES,
+        remaining: null,
+        resetAt: null,
+        media: null,
+        toolCall: null,
+      };
+    }
+
     // The allowance is consumed before any provider-side resource is created,
     // so an over-limit account cannot leave rooms behind on the way to a 429.
     const allowance = await consumeOhapiAllowance(ctx.user.id, "text", HOURLY_TEXT_LIMIT);
@@ -370,8 +408,10 @@ export const ohapiChatRouter = router({
 
       return {
         content: reply.content,
-        remaining: allowance.remaining,
-        resetAt: allowance.resetAt,
+        crisis: false as const,
+        resources: null,
+        remaining: allowance.remaining as number | null,
+        resetAt: allowance.resetAt as Date | null,
         media,
         // Owner-only diagnostic. The provider signals something here that the
         // reply text does not express, and its shape needs observing before any
