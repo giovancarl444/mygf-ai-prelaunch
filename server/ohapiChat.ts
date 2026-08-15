@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { adultProcedure } from "./ohapiAccess";
 import {
   createOhApiRoom,
@@ -13,12 +13,24 @@ import {
 } from "./ohapi";
 import { type ChatMediaKind, composeMediaPrompt, detectChatMediaRequest } from "./ohapiChatIntent";
 import { CRISIS_RESOURCES, CRISIS_RESPONSE, detectCrisisLanguage } from "./ohapiCrisis";
+import {
+  clearGuestSession,
+  describeGuestAllowance,
+  GUEST_LIMIT_REACHED,
+  GUEST_MEDIA_LIMIT,
+  GUEST_MESSAGE_LIMIT,
+  isGuestUser,
+  readGuestCookie,
+  startGuestSession,
+} from "./ohapiGuest";
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import { randomUUID } from "node:crypto";
 import { PHOTO_RESOLUTION, submitMediaJob, USE_PROMPT_ENHANCEMENT } from "./ohapiMediaJobs";
 import {
+  adoptGuestSession,
   clearOwnedOhapiRoom,
   consumeOhapiAllowance,
+  countOwnedOhapiUserMessages,
   createOhapiMediaJob,
   countLiveOhapiRooms,
   countOhapiRoomsCreatedThisHour,
@@ -227,24 +239,75 @@ async function startRequestedMedia(input: {
 }
 
 export const ohapiChatRouter = router({
-  /** Account state the chat UI needs before it can send anything. */
-  session: protectedProcedure.query(async ({ ctx }) => {
-    const [textAllowance, threads, adultConfirmedAt] = await Promise.all([
+  /**
+   * What the chat UI needs before it can send anything.
+   *
+   * Public, because a visitor who has not created an account still has a state
+   * worth reporting: whether they have confirmed their age, and how much they
+   * can do before being asked to sign up.
+   */
+  session: publicProcedure.query(async ({ ctx }) => {
+    if (!ctx.user) {
+      return {
+        adultConfirmed: false,
+        signedIn: false,
+        isGuest: false,
+        messagesRemaining: 0,
+        messageLimit: HOURLY_TEXT_LIMIT,
+        guestMessagesLeft: GUEST_MESSAGE_LIMIT,
+        guestMediaLeft: GUEST_MEDIA_LIMIT,
+        threads: [] as Awaited<ReturnType<typeof listOwnedOhapiRooms>>,
+      };
+    }
+
+    const [textAllowance, threads, adultConfirmedAt, guest] = await Promise.all([
       peekOhapiAllowance(ctx.user.id, "text", HOURLY_TEXT_LIMIT),
       listOwnedOhapiRooms(ctx.user.id),
       getUserAdultConfirmedAt(ctx.user.id),
+      describeGuestAllowance(ctx.user),
     ]);
     return {
       adultConfirmed: Boolean(adultConfirmedAt),
+      signedIn: !guest.isGuest,
+      isGuest: guest.isGuest,
       messagesRemaining: textAllowance.remaining,
       messageLimit: HOURLY_TEXT_LIMIT,
+      guestMessagesLeft: guest.messagesLeft ?? GUEST_MESSAGE_LIMIT,
+      guestMediaLeft: guest.mediaLeft ?? GUEST_MEDIA_LIMIT,
       threads,
     };
   }),
 
-  confirmAdult: protectedProcedure.mutation(async ({ ctx }) => {
+  /**
+   * The age gate, and the one moment a guest identity is created.
+   *
+   * Someone confirming they are an adult is exactly when a visitor becomes
+   * worth a row: it is the first thing we need to have recorded about them, and
+   * everything downstream enforces against it.
+   */
+  confirmAdult: publicProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.user) {
+      const guest = await startGuestSession(ctx.res, ctx.req);
+      return { adultConfirmed: true, confirmedAt: guest.adultConfirmedAt, isGuest: true };
+    }
     const confirmedAt = await markUserAdultConfirmed(ctx.user.id);
-    return { adultConfirmed: true, confirmedAt };
+    return { adultConfirmed: true, confirmedAt, isGuest: isGuestUser(ctx.user) };
+  }),
+
+  /**
+   * Moves a guest's conversation onto the account they just made.
+   *
+   * The saved conversation is the reason someone signs up at that moment, so it
+   * cannot be the thing they lose by doing it. Called by the client once
+   * authentication completes.
+   */
+  adoptGuestConversation: protectedProcedure.mutation(async ({ ctx }) => {
+    const guestUserId = readGuestCookie(ctx.req);
+    if (!guestUserId || guestUserId === ctx.user.id) return { adopted: false };
+
+    const result = await adoptGuestSession({ guestUserId, userId: ctx.user.id });
+    clearGuestSession(ctx.res, ctx.req);
+    return result;
   }),
 
   /**
@@ -352,6 +415,16 @@ export const ohapiChatRouter = router({
         media: null,
         toolCall: null,
       };
+    }
+
+    // A visitor gets a real conversation before being asked for anything, and
+    // then gets asked. Checked before the allowance and before the provider, so
+    // the message that hits the wall costs nothing.
+    if (isGuestUser(ctx.user)) {
+      const used = await countOwnedOhapiUserMessages(ctx.user.id);
+      if (used >= GUEST_MESSAGE_LIMIT) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: GUEST_LIMIT_REACHED });
+      }
     }
 
     // The allowance is consumed before any provider-side resource is created,

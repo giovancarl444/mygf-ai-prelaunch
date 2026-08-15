@@ -19,7 +19,7 @@ studio where it belongs.
 | `/companions` | Public | Full catalog with search and age filter. |
 | `/companion/:slug` | Public | One companion's profile, and the entry point to her chat. |
 | `/chat` | Signed in | Your conversations. |
-| `/chat/:slug` | Signed in + adult confirmed | The conversation. Photos, voice notes, and video are asked for in it and arrive in it. |
+| `/chat/:slug` | Adult confirmed | The conversation. Photos, voice notes, and video are asked for in it and arrive in it. An account is asked for after three messages, not before the first. |
 | `/ops/ohapi` | Owner only | Operational studio: sync, curate, create. Not linked from the customer product. |
 | `/pilot` | — | Removed. Redirects to `/companions`. |
 
@@ -97,6 +97,30 @@ the cheapest realism available.
 It is a per-conversation choice, changeable from the chat header and applied by
 the provider from her next reply. `default` and `long-form` remain available for
 anyone who wants the longer register.
+
+## Talk first, sign up to keep it
+
+A cold visitor arriving from search will not create an account to find out
+whether the product is any good. So the wall moved: confirm your age, browse,
+open a conversation, and get **three messages and one generation** before
+anything is asked of you.
+
+A guest is a real row in `users`, distinguished only by an `openId` that starts
+`guest:`. That is deliberate — ownership, allowances, media jobs, and the safety
+protocol already key on a user id, and none of them need to learn about a second
+kind of account. The identity is created at one moment only: age confirmation.
+Nothing is created for a visitor who only browses, and nothing for a crawler.
+
+The free allowance is a lifetime one, not hourly — an hourly reset would make it
+free. It is enforced in `chat.send` before the allowance is charged and before
+the provider is called, and again inside `submitMediaJob`, which every
+generation in the product passes through. A ceiling reachable by finding another
+entry point is not a ceiling.
+
+Signing up is what the wall asks for, so the conversation cannot be what it
+costs. `chat.adoptGuestConversation` moves the guest's rooms, media, and reports
+onto the new account and collapses any duplicate room, then the guest row is
+deleted.
 
 ## The safety protocol
 

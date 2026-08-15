@@ -46,10 +46,9 @@ describe("anonymous access", () => {
   it("keeps every account-owned operation closed", async () => {
     const caller = appRouter.createCaller(anonymousContext());
 
-    await expect(caller.chat.session()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.chat.history({ worldSlug: "someone" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.chat.send({ worldSlug: "someone", message: "hi" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    await expect(caller.chat.confirmAdult()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.chat.adoptGuestConversation()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.media.image({ worldSlug: "someone", prompt: "x" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.media.video({ worldSlug: "someone", prompt: "x" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.media.audio({ worldSlug: "someone", text: "x" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
@@ -59,6 +58,21 @@ describe("anonymous access", () => {
   it("still allows public discovery so the catalog renders signed out", async () => {
     const caller = appRouter.createCaller(anonymousContext());
     await expect(caller.companions.list()).resolves.toEqual([]);
+  });
+
+  /**
+   * A visitor has a state worth reporting before they have an identity: they
+   * have not confirmed their age, and they have a free allowance waiting. The
+   * session read is public so the page can say so without an account.
+   */
+  it("reports a safe empty state to a visitor rather than refusing", async () => {
+    const caller = appRouter.createCaller(anonymousContext());
+    await expect(caller.chat.session()).resolves.toMatchObject({
+      adultConfirmed: false,
+      signedIn: false,
+      isGuest: false,
+      threads: [],
+    });
   });
 });
 

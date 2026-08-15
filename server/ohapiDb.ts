@@ -195,6 +195,84 @@ export async function setOhapiCharacterTagline(input: { worldSlug: string; tagli
 /* Adult confirmation                                                          */
 /* -------------------------------------------------------------------------- */
 
+export async function getUserById(userId: number) {
+  const db = await requireDb();
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0];
+}
+
+/**
+ * A visitor who has confirmed their age but not created an account.
+ *
+ * Adult confirmation is recorded at creation because that is the only moment
+ * this row is made: it exists because someone confirmed. Recording it later
+ * would allow a guest to exist unconfirmed, which the generative procedures
+ * would then have to reason about.
+ */
+export async function createGuestUser(openId: string) {
+  const db = await requireDb();
+  await db.insert(users).values({
+    openId,
+    loginMethod: "guest",
+    role: "user",
+    adultConfirmedAt: new Date(),
+  });
+  const rows = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const user = rows[0];
+  if (!user) throw new Error("The guest session could not be created.");
+  return user;
+}
+
+/** Everything a guest has said, across every conversation they opened. */
+export async function countOwnedOhapiUserMessages(userId: number) {
+  const db = await requireDb();
+  const rows = await db.select({ total: sql<number>`count(*)` })
+    .from(ohapiMessages)
+    .innerJoin(ohapiRooms, eq(ohapiMessages.roomId, ohapiRooms.id))
+    .where(and(eq(ohapiRooms.userId, userId), eq(ohapiMessages.role, "user")));
+  return Number(rows[0]?.total ?? 0);
+}
+
+export async function countOwnedOhapiMediaJobs(userId: number) {
+  const db = await requireDb();
+  const rows = await db.select({ total: sql<number>`count(*)` })
+    .from(ohapiMediaJobs)
+    .where(eq(ohapiMediaJobs.userId, userId));
+  return Number(rows[0]?.total ?? 0);
+}
+
+/**
+ * Moves everything a guest did onto the account they just created.
+ *
+ * The conversation is the reason someone signs up at that moment, so losing it
+ * at the point of conversion would be the worst possible time to lose it.
+ * Rooms carry their messages and media by foreign key, so re-pointing the
+ * owning rows is enough — then duplicates are collapsed, because the account
+ * may already hold a room with the same companion.
+ */
+export async function adoptGuestSession(input: { guestUserId: number; userId: number }) {
+  const db = await requireDb();
+  const guest = await getUserById(input.guestUserId);
+  if (!guest || guest.loginMethod !== "guest" || guest.id === input.userId) return { adopted: false };
+
+  const rooms = await db.select({ ohapiCharacterId: ohapiRooms.ohapiCharacterId })
+    .from(ohapiRooms).where(eq(ohapiRooms.userId, input.guestUserId));
+
+  await db.update(ohapiRooms).set({ userId: input.userId }).where(eq(ohapiRooms.userId, input.guestUserId));
+  await db.update(ohapiMediaJobs).set({ userId: input.userId }).where(eq(ohapiMediaJobs.userId, input.guestUserId));
+  await db.update(ohapiReports).set({ userId: input.userId }).where(eq(ohapiReports.userId, input.guestUserId));
+  await db.delete(ohapiRateLimits).where(eq(ohapiRateLimits.userId, input.guestUserId));
+
+  // The account may already have talked to the same companion from another
+  // device. Two live rooms for one pairing is the defect dedupe exists for.
+  for (const characterId of Array.from(new Set(rooms.map(room => room.ohapiCharacterId)))) {
+    await dedupeOwnedOhapiRooms({ userId: input.userId, ohapiCharacterId: characterId });
+  }
+
+  await db.delete(users).where(eq(users.id, input.guestUserId));
+  return { adopted: true, rooms: rooms.length };
+}
+
 export async function markUserAdultConfirmed(userId: number) {
   const db = await requireDb();
   const now = new Date();

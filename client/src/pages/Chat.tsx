@@ -58,16 +58,16 @@ export default function Chat() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const utils = trpc.useUtils();
 
-  const session = trpc.chat.session.useQuery(undefined, { enabled: isAuthenticated });
+  const session = trpc.chat.session.useQuery(undefined);
   const adultConfirmed = Boolean(session.data?.adultConfirmed);
   const companion = trpc.companions.bySlug.useQuery({ worldSlug: slug }, { enabled: Boolean(slug) });
   const history = trpc.chat.history.useQuery(
     { worldSlug: slug },
-    { enabled: isAuthenticated && Boolean(slug) && adultConfirmed },
+    { enabled: Boolean(slug) && adultConfirmed },
   );
   const gallery = trpc.media.gallery.useQuery(
     { worldSlug: slug },
-    { enabled: isAuthenticated && Boolean(slug) && adultConfirmed },
+    { enabled: Boolean(slug) && adultConfirmed },
   );
 
   const [draft, setDraft] = useState("");
@@ -92,6 +92,24 @@ export default function Chat() {
     onSuccess: async () => { await utils.chat.session.invalidate(); },
   });
 
+  const isGuest = Boolean(session.data?.isGuest);
+  const [walled, setWalled] = useState(false);
+
+  // Signing in is what the wall asks for, so the conversation that prompted it
+  // has to survive the round trip. Claimed once, as soon as an account exists.
+  const adoptGuest = trpc.chat.adoptGuestConversation.useMutation({
+    onSuccess: async () => {
+      await Promise.all([utils.chat.history.invalidate(), utils.chat.session.invalidate()]);
+    },
+  });
+  const adoptedRef = useRef(false);
+  useEffect(() => {
+    if (!isAuthenticated || adoptedRef.current || session.data?.isGuest !== false) return;
+    adoptedRef.current = true;
+    adoptGuest.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, session.data?.isGuest]);
+
   const send = trpc.chat.send.useMutation({
     onSuccess: async result => {
       setPendingMessage(null);
@@ -103,7 +121,10 @@ export default function Chat() {
       }
       await Promise.all([utils.chat.history.invalidate(), utils.chat.session.invalidate()]);
     },
-    onError: () => setPendingMessage(null),
+    onError: error => {
+      setPendingMessage(null);
+      if (error.data?.code === "UNAUTHORIZED") setWalled(true);
+    },
   });
 
   const clearThread = trpc.chat.clearThread.useMutation({
@@ -271,28 +292,6 @@ export default function Chat() {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="app-shell">
-        <AppHeader />
-        <main className="gate">
-          <div className="gate-card">
-            <LockKeyhole size={30} />
-            <h1>Sign in to start talking</h1>
-            <p>
-              Your conversation is tied to your account — that is what keeps the thread
-              yours, lets you clear it whenever you want, and makes reporting work.
-            </p>
-            <button type="button" className="primary-button large" onClick={() => startLogin()}>
-              Sign in to continue
-            </button>
-            <p className="gate-foot">18+ only · Every companion is AI · Not therapy</p>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   if (session.data && !adultConfirmed) {
     return (
       <div className="app-shell">
@@ -302,8 +301,8 @@ export default function Chat() {
             <ShieldCheck size={30} />
             <h1>Confirm you are an adult</h1>
             <p>
-              This is an adult experience. We record this confirmation on your account
-              once, and it is checked on every request from here on.
+              This is an adult experience. We record this confirmation once, and it is
+              checked on every request from here on — no account needed to start.
             </p>
             <label className="gate-checkbox">
               <input
@@ -612,6 +611,26 @@ export default function Chat() {
                 <pre className="chat-toolcall">
                   tool_call: {JSON.stringify(send.data.toolCall, null, 2)}
                 </pre>
+              )}
+
+              {walled && (
+                <aside className="chat-wall">
+                  <p className="chat-wall-lede">Create a free account to keep talking.</p>
+                  <p>
+                    Your conversation with {firstName} is saved — signing in brings it with you.
+                  </p>
+                  <button type="button" className="primary-button" onClick={() => startLogin()}>
+                    Save this conversation
+                  </button>
+                </aside>
+              )}
+
+              {isGuest && !walled && typeof session.data?.guestMessagesLeft === "number"
+                && session.data.guestMessagesLeft <= 2 && (
+                <p className="chat-notice">
+                  <CircleAlert size={14} />
+                  {session.data.guestMessagesLeft} free {session.data.guestMessagesLeft === 1 ? "message" : "messages"} left.
+                </p>
               )}
 
               <div className="chat-composer">

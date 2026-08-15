@@ -10,6 +10,9 @@ const state = vi.hoisted(() => ({
   mediaAllowanceUsed: 0,
   roomsThisHour: 0,
   liveRooms: 0,
+  actor: { id: 7, openId: "member", role: "user" } as Record<string, unknown> | undefined,
+  guestMessagesUsed: 0,
+  guestMediaUsed: 0,
 }));
 
 const provider = vi.hoisted(() => ({
@@ -44,6 +47,12 @@ vi.mock("./ohapiDb", async importOriginal => {
   return {
     ...original,
     getUserAdultConfirmedAt: vi.fn(async () => state.adultConfirmedAt),
+    peekOhapiAllowance: vi.fn(async (_userId: number, _scope: string, limit: number) =>
+      original.describeOhapiAllowance(0, limit)),
+    listOwnedOhapiRooms: vi.fn(async () => []),
+    getUserById: vi.fn(async () => state.actor),
+    countOwnedOhapiUserMessages: vi.fn(async () => state.guestMessagesUsed),
+    countOwnedOhapiMediaJobs: vi.fn(async () => state.guestMediaUsed),
     getChattableOhapiCharacter: vi.fn(async () => state.companion),
     getOwnedOhapiRoom: vi.fn(async () => state.existingRoom),
     countLiveOhapiRooms: vi.fn(async () => state.liveRooms),
@@ -92,6 +101,9 @@ beforeEach(() => {
   state.mediaAllowanceUsed = 0;
   state.roomsThisHour = 0;
   state.liveRooms = 0;
+  state.actor = { id: 7, openId: "member", role: "user" };
+  state.guestMessagesUsed = 0;
+  state.guestMediaUsed = 0;
   provider.createRoom.mockReset().mockImplementation(async () => {
     calls.push("providerCreateRoom");
     return "room-abc";
@@ -464,5 +476,81 @@ describe("the safety protocol", () => {
 
     expect(result.crisis).toBe(false);
     expect(provider.generateText).toHaveBeenCalled();
+  });
+});
+
+/**
+ * A cold visitor will not create an account to find out whether the product is
+ * any good. The wall moves: talk first, sign up to keep it. What matters is
+ * that it is a wall and not a suggestion, and that hitting it costs nothing.
+ */
+describe("talking before signing up", () => {
+  function guestCaller() {
+    const ctx: TrpcContext = {
+      user: { id: 42, openId: "guest:11111111-2222-3333-4444-555555555555", role: "user" } as User,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: {} as TrpcContext["res"],
+    };
+    return appRouter.createCaller(ctx);
+  }
+
+  beforeEach(() => {
+    state.actor = { id: 42, openId: "guest:11111111-2222-3333-4444-555555555555", role: "user" };
+  });
+
+  it("lets a visitor talk", async () => {
+    const result = await guestCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "hey" });
+    expect(result.content).toBe("Hi — good to hear from you.");
+  });
+
+  it("stops them at the free limit", async () => {
+    state.guestMessagesUsed = 3;
+    await expect(guestCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "hey" }))
+      .rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  /** The message that hits the wall must not cost anything or reach anyone. */
+  it("charges nothing and calls nobody once the wall is up", async () => {
+    state.guestMessagesUsed = 3;
+    await expect(guestCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "hey" })).rejects.toThrow();
+
+    expect(calls).not.toContain("consumeAllowance");
+    expect(provider.createRoom).not.toHaveBeenCalled();
+    expect(provider.generateText).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The generation panel is a second door to the same operation. A ceiling that
+   * can be walked around by finding another entry point is not a ceiling.
+   */
+  it("holds the media ceiling on the panel too, not just in chat", async () => {
+    state.guestMediaUsed = 1;
+    await expect(guestCaller().media.image({ worldSlug: "ava-marchetti-4471", prompt: "a portrait" }))
+      .rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(provider.requestImage).not.toHaveBeenCalled();
+  });
+
+  it("leaves accounts alone", async () => {
+    state.guestMessagesUsed = 999;
+    state.guestMediaUsed = 999;
+    const result = await memberCaller().chat.send({ worldSlug: "ava-marchetti-4471", message: "hey" });
+    expect(result.content).toBe("Hi — good to hear from you.");
+  });
+
+  it("reports what a visitor has left", async () => {
+    state.guestMessagesUsed = 1;
+    state.guestMediaUsed = 0;
+    const session = await guestCaller().chat.session();
+    expect(session).toMatchObject({ isGuest: true, signedIn: false, guestMessagesLeft: 2, guestMediaLeft: 1 });
+  });
+
+  /** The safety protocol does not wait for someone to have an account. */
+  it("still interrupts a visitor in crisis", async () => {
+    const result = await guestCaller().chat.send({
+      worldSlug: "ava-marchetti-4471",
+      message: "i want to kill myself",
+    });
+    expect(result.crisis).toBe(true);
+    expect(provider.generateText).not.toHaveBeenCalled();
   });
 });

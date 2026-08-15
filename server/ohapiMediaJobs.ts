@@ -4,13 +4,16 @@ import { classifyOhApiJob, getOhApiJobStatus, type OhApiResolution } from "./oha
 import { isRefundableProviderFailure, providerFailure } from "./ohapiErrors";
 import {
   consumeOhapiAllowance,
+  countOwnedOhapiMediaJobs,
   createOhapiMediaJob,
   expireOldPendingOhapiMediaJobs,
+  getUserById,
   HOURLY_MEDIA_LIMIT,
   listStaleOhapiMediaJobs,
   refundOhapiAllowance,
   updateOhapiMediaJob,
 } from "./ohapiDb";
+import { GUEST_LIMIT_REACHED, GUEST_MEDIA_LIMIT, isGuestUser } from "./ohapiGuest";
 
 /**
  * Let the provider expand the prompt with its own model.
@@ -44,6 +47,17 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
   roomId?: number | null;
   submit: () => Promise<T>;
 }) {
+  // Every generation in the product goes through here, which is why the guest
+  // ceiling is enforced here rather than in each router. A limit that can be
+  // reached by finding another entry point is not a limit.
+  // If the account cannot be read the ceiling is skipped rather than enforced
+  // blindly: the hourly allowance still applies, and the same failure would
+  // stop the job being recorded a moment later anyway.
+  const actor = await getUserById(input.userId).catch(() => undefined);
+  if (actor && isGuestUser(actor) && await countOwnedOhapiMediaJobs(actor.id) >= GUEST_MEDIA_LIMIT) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: GUEST_LIMIT_REACHED });
+  }
+
   const allowance = await consumeOhapiAllowance(input.userId, "media", HOURLY_MEDIA_LIMIT);
   if (!allowance.allowed) {
     throw new TRPCError({
