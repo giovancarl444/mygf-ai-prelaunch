@@ -211,19 +211,21 @@ class SDKServer {
       });
       const { openId, appId, name } = payload as Record<string, unknown>;
 
-      if (
-        !isNonEmptyString(openId) ||
-        !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
-      ) {
-        console.warn("[Auth] Session payload missing required fields");
+      // `name` is not part of the identity and is not required to be present.
+      // It was, and because sign-in by email link has no display name to supply
+      // it passed `""` — so every session this product issued was minted, set
+      // as a cookie, and then rejected on the very next request. The customer
+      // saw the sign-in succeed and land them back as a stranger, and the only
+      // trace was one warning a line above this.
+      if (!isNonEmptyString(openId) || !isNonEmptyString(appId)) {
+        console.warn("[Auth] Session payload has no identity");
         return null;
       }
 
       return {
         openId,
         appId,
-        name,
+        name: typeof name === "string" ? name : "",
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
