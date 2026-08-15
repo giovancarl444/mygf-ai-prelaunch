@@ -62,9 +62,34 @@ export function parseDatabaseUrl(rawUrl: string): DatabaseConnection {
   };
 }
 
-/** Explains the failure that TLS misconfiguration actually produces. */
+/**
+ * Explains a connection failure, including the part that is usually hidden.
+ *
+ * Query builders wrap driver errors, so the message on the outer error says
+ * only which statement failed — the reason lives on `cause`, sometimes several
+ * levels down. Reporting the wrapper alone produces "Failed query: create table
+ * …" with no indication of whether that was a refused connection, a rejected
+ * password, or an untrusted certificate.
+ */
 export function describeConnectionFailure(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
+  const chain: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; current instanceof Error && depth < 5; depth += 1) {
+    const code = (current as { code?: string; errno?: number }).code;
+    chain.push(`${current.message}${code ? ` [${code}]` : ""}`);
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  const message = chain.length ? chain.join("\n  caused by: ") : String(error);
+  if (/ECONNREFUSED|ETIMEDOUT|EHOSTUNREACH/i.test(message)) {
+    return `${message}\n\n  The database refused the connection. Check that this machine is listed `
+      + `under the database's Trusted Sources, and that DATABASE_URL uses the VPC host rather than `
+      + `the public one.`;
+  }
+  if (/ACCESS_DENIED|Access denied/i.test(message)) {
+    return `${message}\n\n  The credentials were rejected. If the database password was rotated, `
+      + `/srv/mygf/.env still has the old one.`;
+  }
   if (/self.signed|unable to verify|CERT_/i.test(message)) {
     return `${message}\n\n  The database's certificate could not be verified. Download the provider's `
       + `CA certificate and point DATABASE_CA_CERT at it — for DigitalOcean it is on the database's `

@@ -70,7 +70,32 @@ describe("explaining a failed connection", () => {
       .toContain("ssl-mode=REQUIRED");
   });
 
+  it("names a rejected password, which is otherwise indistinguishable", () => {
+    expect(describeConnectionFailure(new Error("ER_ACCESS_DENIED_ERROR: Access denied for user")))
+      .toContain("password was rotated");
+  });
+
+  it("names a refused connection", () => {
+    expect(describeConnectionFailure(new Error("connect ECONNREFUSED 10.1.2.3:25060")))
+      .toContain("Trusted Sources");
+  });
+
+  /**
+   * Query builders wrap driver errors, so the outer message names only the
+   * statement. Reporting that alone is what turned a rejected connection into
+   * "Failed query: create table …" with no reason attached.
+   */
+  it("unwraps the cause a query builder hides", () => {
+    const driver = Object.assign(new Error("Access denied for user 'doadmin'"), { code: "ER_ACCESS_DENIED_ERROR" });
+    const wrapped = new Error("Failed query: create table if not exists `__drizzle_migrations`", { cause: driver });
+
+    const described = describeConnectionFailure(wrapped);
+    expect(described).toContain("Failed query");
+    expect(described).toContain("Access denied");
+    expect(described).toContain("ER_ACCESS_DENIED_ERROR");
+  });
+
   it("leaves an unrelated failure as it found it", () => {
-    expect(describeConnectionFailure(new Error("ER_ACCESS_DENIED_ERROR"))).toBe("ER_ACCESS_DENIED_ERROR");
+    expect(describeConnectionFailure(new Error("something else entirely"))).toBe("something else entirely");
   });
 });
