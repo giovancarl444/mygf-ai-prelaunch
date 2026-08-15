@@ -2,11 +2,16 @@
 #
 # Prepares a fresh Ubuntu droplet to run MyGF.ai, from nothing to serving.
 #
-# Run once, as root, on a new box:
+# The repository is private, so this cannot be fetched with an anonymous curl.
+# Copy it up from a machine that can see the repository:
 #
+#   scp deploy/bootstrap.sh root@<droplet-ip>:/root/
 #   ssh root@<droplet-ip>
-#   curl -fsSL https://raw.githubusercontent.com/giovancarl444/mygf-ai-prelaunch/main/deploy/bootstrap.sh -o bootstrap.sh
 #   bash bootstrap.sh
+#
+# It is deliberately self-contained — it downloads nothing from the repository,
+# so a private repository, a rate limit, or a network hiccup partway through
+# cannot leave a half-configured machine.
 #
 # It asks for two secrets, works out everything else for itself, and finishes by
 # printing exactly what to paste into the repository's Actions secrets.
@@ -23,7 +28,6 @@ DEPLOY_USER=deploy
 APP_USER=mygf
 APP_ROOT=/srv/mygf
 ENV_FILE="$APP_ROOT/.env"
-REPO_RAW="https://raw.githubusercontent.com/giovancarl444/mygf-ai-prelaunch/main"
 
 say() { printf '\n\033[1;35m▸ %s\033[0m\n' "$1"; }
 note() { printf '  %s\n' "$1"; }
@@ -192,7 +196,39 @@ ENV
   note "$ENV_FILE written, readable only by root and the service"
 fi
 
-curl -fsSL "$REPO_RAW/deploy/mygf.service" -o /etc/systemd/system/mygf.service
+# Written out rather than fetched, so this script needs nothing but itself.
+# Kept identical to deploy/mygf.service in the repository.
+cat > /etc/systemd/system/mygf.service <<'UNIT'
+[Unit]
+Description=MyGF.ai
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mygf
+Group=mygf
+WorkingDirectory=/srv/mygf/current
+EnvironmentFile=/srv/mygf/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=3
+
+# The process needs its own release directory and nothing else on the box. If
+# it is ever compromised, this is the difference between one directory and the
+# whole machine.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/mygf
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
 note "systemd unit installed"
 
 cat > /etc/caddy/Caddyfile <<CADDY

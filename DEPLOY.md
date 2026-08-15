@@ -45,11 +45,25 @@ public one.
 
 ## Then one command on the droplet
 
+The repository is private, so the script cannot be fetched with an anonymous
+`curl` — copy it up instead:
+
 ```bash
+scp deploy/bootstrap.sh root@<droplet-ip>:/root/
 ssh root@<droplet-ip>
-curl -fsSL https://raw.githubusercontent.com/giovancarl444/mygf-ai-prelaunch/main/deploy/bootstrap.sh -o bootstrap.sh
 bash bootstrap.sh
 ```
+
+From Windows, if the file came down through a browser, strip the line endings
+first or `bash` will fail on the carriage returns:
+
+```bash
+sed -i 's/\r$//' bootstrap.sh
+```
+
+The script is self-contained and downloads nothing from the repository, so a
+private repository or a network hiccup partway through cannot leave a
+half-configured machine.
 
 It asks for the database connection string and the OhAPI key, reads both without
 echoing, and writes them only to `/srv/mygf/.env` at mode 640. Everything else
