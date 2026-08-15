@@ -196,6 +196,16 @@ Two rules it enforces:
   otherwise the host that served the request — so canonicals stay correct
   through a domain change instead of pointing at a hostname the site has left.
 
+## Paying
+
+Subscription for access and conversation, consumable credits for media — the
+split is forced by the cost curve, since text is flat per customer and media is
+not. `MONETIZATION.md` carries the plans, the margin arithmetic, the payment
+rails including crypto, and what is still missing.
+
+Nothing can be charged yet: the entitlement system is built, no provider is
+integrated.
+
 ## Limits
 
 Per account, per UTC hour: 60 messages, 12 media generations, 12 new rooms, and a

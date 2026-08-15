@@ -78,6 +78,13 @@
       "when": 1786784531675,
       "tag": "0010_slim_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1786785363890,
+      "tag": "0011_broken_captain_flint",
+      "breakpoints": true
     }
   ]
 }

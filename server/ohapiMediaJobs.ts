@@ -14,6 +14,7 @@ import {
   updateOhapiMediaJob,
 } from "./ohapiDb";
 import { GUEST_LIMIT_REACHED, GUEST_MEDIA_LIMIT, isGuestUser } from "./ohapiGuest";
+import { authoriseMediaSpend, recordMediaSpend } from "./billing";
 
 /**
  * Let the provider expand the prompt with its own model.
@@ -58,6 +59,21 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
     throw new TRPCError({ code: "UNAUTHORIZED", message: GUEST_LIMIT_REACHED });
   }
 
+  // What the customer is entitled to, before what the rate limiter permits.
+  // The two answer different questions: this one is "have they paid for this",
+  // the next is "are they going too fast".
+  const spend = actor
+    ? await authoriseMediaSpend({ user: actor, kind: input.kind }).catch(() => null)
+    : null;
+  if (spend && !spend.allowed) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: spend.reason === "guest_limit"
+        ? GUEST_LIMIT_REACHED
+        : "You are out of credits. Top up to keep generating.",
+    });
+  }
+
   const allowance = await consumeOhapiAllowance(input.userId, "media", HOURLY_MEDIA_LIMIT);
   if (!allowance.allowed) {
     throw new TRPCError({
@@ -72,6 +88,13 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
   } catch (error) {
     if (isRefundableProviderFailure(error)) await refundOhapiAllowance(input.userId, "media");
     return providerFailure(error);
+  }
+
+  // Charged only once the provider has accepted the work. Taking the credit
+  // before submission would bill for requests that never reached anyone.
+  if (spend?.allowed && spend.source !== "guest") {
+    await recordMediaSpend({ userId: input.userId, cost: spend.cost, note: spend.source })
+      .catch(error => console.error("[Billing] A spend could not be recorded:", error));
   }
 
   // Audio is synchronous: it answers with the finished file and no job id, so

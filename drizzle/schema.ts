@@ -1,4 +1,4 @@
-import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -59,6 +59,89 @@ export const authLoginTokens = mysqlTable("auth_login_tokens", {
 }, table => ({
   emailCreatedIndex: index("auth_login_tokens_email_created_index").on(table.email, table.createdAt),
   expiresIndex: index("auth_login_tokens_expires_index").on(table.expiresAt),
+}));
+
+/**
+ * What an account is entitled to, and what it paid.
+ *
+ * Kept deliberately separate from *how* it paid. A card processor, a crypto
+ * settlement, and a manual comp all grant the same thing through the same
+ * table — see `server/billing.ts` for why that separation is the load-bearing
+ * decision rather than an abstraction for its own sake.
+ */
+export const subscriptions = mysqlTable("subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  planId: varchar("planId", { length: 32 }).notNull(),
+  status: mysqlEnum("status", ["active", "past_due", "cancelled", "expired"]).default("active").notNull(),
+  // The period the customer has already paid for. Entitlements are read from
+  // these two columns and nothing else, so a lapsed subscription degrades to
+  // the free plan without anything having to run on a schedule.
+  currentPeriodStart: timestamp("currentPeriodStart").notNull(),
+  currentPeriodEnd: timestamp("currentPeriodEnd").notNull(),
+  // Set when someone cancels: they keep what they paid for until the period
+  // ends. Cancelling must never feel like a punishment, or they charge back
+  // instead of cancelling.
+  cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  userIndex: index("subscriptions_user_index").on(table.userId),
+  activeIndex: index("subscriptions_status_period_index").on(table.status, table.currentPeriodEnd),
+}));
+
+/**
+ * Every credit movement, append-only.
+ *
+ * A balance is the sum of this table and is never stored as a column. That
+ * costs an aggregate on read and buys the thing that matters when someone
+ * disputes a charge: an ordered, immutable answer to "where did my credits
+ * go", with the media job that spent each one still attached.
+ */
+export const creditLedger = mysqlTable("credit_ledger", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  // Positive on purchase or grant, negative on spend. In our own units, not
+  // the provider's — provider pricing is an implementation detail and must
+  // never leak into what a customer sees.
+  delta: int("delta").notNull(),
+  reason: mysqlEnum("reason", ["purchase", "grant", "spend", "refund", "expiry", "correction"]).notNull(),
+  // What it was spent on, or what paid for it. Nullable because a goodwill
+  // grant has neither.
+  mediaJobId: int("mediaJobId").references(() => ohapiMediaJobs.id),
+  paymentId: int("paymentId"),
+  note: varchar("note", { length: 240 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  userCreatedIndex: index("credit_ledger_user_created_index").on(table.userId, table.createdAt),
+}));
+
+/**
+ * Money in, from any source.
+ *
+ * `provider` is a string rather than an enum on purpose: adding a settlement
+ * route should not require a migration, because the whole point of this table
+ * is that the payment rail is the part most likely to change under us.
+ */
+export const payments = mysqlTable("payments", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  provider: varchar("provider", { length: 32 }).notNull(),
+  // The provider's own identifier. Unique so a webhook delivered twice — which
+  // every provider does — cannot grant the same entitlement twice.
+  providerRef: varchar("providerRef", { length: 191 }).notNull().unique(),
+  kind: mysqlEnum("kind", ["subscription", "credits"]).notNull(),
+  planId: varchar("planId", { length: 32 }),
+  creditsGranted: int("creditsGranted"),
+  amountCents: int("amountCents").notNull(),
+  currency: varchar("currency", { length: 12 }).notNull(),
+  status: mysqlEnum("status", ["pending", "settled", "refunded", "disputed", "failed"]).default("pending").notNull(),
+  settledAt: timestamp("settledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  userCreatedIndex: index("payments_user_created_index").on(table.userId, table.createdAt),
+  providerIndex: index("payments_provider_status_index").on(table.provider, table.status),
 }));
 
 export const ohapiCharacters = mysqlTable("ohapi_characters", {
@@ -178,6 +261,12 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type BetaInterest = typeof betaInterests.$inferSelect;
 export type InsertBetaInterest = typeof betaInterests.$inferInsert;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = typeof subscriptions.$inferInsert;
+export type CreditLedgerEntry = typeof creditLedger.$inferSelect;
+export type InsertCreditLedgerEntry = typeof creditLedger.$inferInsert;
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = typeof payments.$inferInsert;
 export type AuthLoginToken = typeof authLoginTokens.$inferSelect;
 export type InsertAuthLoginToken = typeof authLoginTokens.$inferInsert;
 export type OhapiCharacter = typeof ohapiCharacters.$inferSelect;

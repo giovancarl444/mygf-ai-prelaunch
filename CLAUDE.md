@@ -50,6 +50,7 @@ OHAPI_API_KEY='...' node scripts/ohapi-probe.mjs --image  # costs credit
 | `server/ohapiStudio.ts` | Owner-only operations at `/ops/ohapi`. |
 | `server/ohapiAccess.ts` | Server-enforced adult confirmation. |
 | `server/auth.ts` | Sign-in links. Ours, not a provider's. |
+| `server/billing.ts` | Plans, entitlements, credit ledger, settlement. Rail-agnostic on purpose. |
 | `server/email.ts` | The one message this product sends. |
 | `server/ohapiGuest.ts` | Visitors who have not signed up yet. Three messages, one generation. |
 | `server/seo.ts` | Per-route metadata, `robots.txt`, `sitemap.xml`. Mounted before the SPA catch-all. |
@@ -65,6 +66,11 @@ OHAPI_API_KEY='...' node scripts/ohapi-probe.mjs --image  # costs credit
 - A message that reads as self-harm never reaches the provider and is never
   charged for. The companion does not answer it; the product does.
 - Allowances are charged before provider-side resources exist.
+- Entitlements never depend on how someone paid. Every rail — card, crypto,
+  comp — settles through `settlePayment`, idempotent by `providerRef`.
+- Prices and included allowances live in `PLANS`, in code. Read
+  `MONETIZATION.md` before changing one; the numbers have arithmetic behind
+  them and one of them is a placeholder waiting on a measurement.
 - Provider error text never reaches the customer — `server/ohapiErrors.ts` maps
   status classes to safe copy.
 
