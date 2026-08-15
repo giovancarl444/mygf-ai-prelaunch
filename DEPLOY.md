@@ -29,54 +29,84 @@ Put the droplet and the database in the **same region**, and use the database's
 **private network** host. Cross-region is latency on every request and
 bandwidth you pay for.
 
-## Once, on a fresh droplet
+## Create two things in the DigitalOcean console
+
+**Droplet** — region **NYC3**, image **Ubuntu 24.04 LTS**, size **Basic /
+Regular / $18** (2 GB, 2 vCPU), authentication **SSH key**, backups on.
+
+NYC3 rather than anywhere else because the provider serves its media from
+`us-east-1`, so this is the shortest hop to the thing every request talks to,
+and because the largest market for English search traffic is there.
+
+**Managed MySQL 8** — the **same region**, Basic $15 (1 GB). Then
+*Settings → Trusted Sources → add the droplet*, which takes the database off the
+public internet entirely, and copy the **VPC** connection string rather than the
+public one.
+
+## Then one command on the droplet
 
 ```bash
-scp deploy/setup-droplet.sh root@<droplet>:/tmp/
-ssh root@<droplet> bash /tmp/setup-droplet.sh
-
-scp deploy/mygf.service root@<droplet>:/etc/systemd/system/mygf.service
-scp deploy/Caddyfile    root@<droplet>:/etc/caddy/Caddyfile   # edit the hostname first
-ssh root@<droplet> 'systemctl daemon-reload && systemctl enable mygf && systemctl reload caddy'
+ssh root@<droplet-ip>
+curl -fsSL https://raw.githubusercontent.com/giovancarl444/mygf-ai-prelaunch/main/deploy/bootstrap.sh -o bootstrap.sh
+bash bootstrap.sh
 ```
 
-Then write `/srv/mygf/.env` from `.env.example`, and add the CI public key to
-`/home/deploy/.ssh/authorized_keys`.
+It asks for the database connection string and the OhAPI key, reads both without
+echoing, and writes them only to `/srv/mygf/.env` at mode 640. Everything else
+it works out: the public address, the certificate hostname, the session secret,
+the deploy key, the service, the firewall.
+
+It finishes by printing the six repository secrets to paste into
+*Settings → Secrets and variables → Actions*. After that, deploying is
+`git push origin main`.
+
+Safe to run again — every step checks before it acts, and an existing `.env` is
+left alone.
+
+### No domain yet
+
+The script points the certificate at `<address-with-dashes>.sslip.io`, a
+hostname that resolves to the address inside it. A real certificate is issued
+for a domain nobody had to register, so deployment does not wait on the brand
+decision. When the real domain arrives, two things change: the hostname in
+`/etc/caddy/Caddyfile`, and `PUBLIC_BASE_URL` in `/srv/mygf/.env`.
 
 ## The repository secrets CI needs
 
 | Secret | What |
 | --- | --- |
-| `DEPLOY_HOST` | Droplet IP or hostname |
+| `DEPLOY_HOST` | Droplet address |
 | `DEPLOY_USER` | `deploy` |
-| `DEPLOY_SSH_KEY` | Private half of the CI deploy key |
-| `DEPLOY_KNOWN_HOSTS` | `ssh-keyscan <droplet>` — pinned, so a changed host key fails the deploy |
-| `PUBLIC_BASE_URL` | Used only for the post-deploy check |
-| `VITE_APP_ID` | Read at build time and baked into the bundle. Any non-empty string. |
+| `DEPLOY_SSH_KEY` | Private half of the CI deploy key — generated on the server, so it never crosses a laptop |
+| `DEPLOY_KNOWN_HOSTS` | Pinned host key, so a changed one fails the deploy |
+| `PUBLIC_BASE_URL` | Used for the post-deploy check |
+| `VITE_APP_ID` | Baked into the bundle. Any non-empty string. |
 
 ## Moving the data off Manus
 
-Do this **before** the account deletion window, not during it.
+`deploy/migrate-data.sh` does this in the order that matters, and refuses to
+proceed if handed a dump that would undo it.
 
 ```bash
-mysqldump --single-transaction --routines --set-gtid-purged=OFF \
-  -h <manus-host> -u <user> -p <database> > mygf-backup.sql
+# Only if the old credentials still work. Data only — no table definitions.
+mysqldump --single-transaction --no-create-info --set-gtid-purged=OFF \
+  -h <old-host> -u <user> -p <database> > old-data.sql
+
+# Then, against the new database:
+DATABASE_URL='mysql://…' bash deploy/migrate-data.sh old-data.sql
 ```
 
-Then, against the new database, **run the migrations first and import data
-second**:
+With no dump, run it with no argument. That is the normal case and not a loss:
+the companion catalogue rebuilds from the provider on the first sync, and the
+portrait URLs in any old database expired an hour after they were issued anyway.
 
-```bash
-DATABASE_URL='mysql://…' pnpm exec drizzle-kit migrate
-mysql -h <do-host> -u <user> -p <database> < mygf-data-only.sql
-```
-
-This is worth understanding rather than copying: the production
-`__drizzle_migrations` ledger has been broken since the original deploy, which
-is why every schema change so far has been hand-run SQL. A fresh database
-running the migrations from zero builds that ledger correctly. **The move
-repairs it for free** — but only in this order. Importing a dump that contains
-the old tables first puts you back where you started.
+**Why the order matters.** The production `__drizzle_migrations` ledger has been
+broken since the original deploy, which is why every schema change so far has
+been hand-run SQL. Building the schema from zero writes that ledger correctly
+and repairs the problem permanently — but only if it happens before any old
+tables land. The script checks the dump for `CREATE TABLE` and stops if it finds
+any, because importing table definitions is precisely what would carry the
+broken state across.
 
 ## Rolling back
 
