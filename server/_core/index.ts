@@ -32,6 +32,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 async function startServer() {
   const app = express();
+  // Nothing gains from telling every visitor which framework to look up
+  // advisories for.
+  app.disable("x-powered-by");
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
@@ -52,12 +55,12 @@ async function startServer() {
   // What a crawler sees. Mounted before the single-page handlers, which
   // otherwise answer every path — including /robots.txt — with the HTML shell.
   const isDevelopment = process.env.NODE_ENV === "development";
-  registerSeoRoutes(app, {
-    enabled: !isDevelopment,
-    distPath: isDevelopment
-      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
-      : path.resolve(import.meta.dirname, "public"),
-  });
+  // Resolved once. The metadata handler and the static handler both need it,
+  // and working it out twice is how one of them ends up looking somewhere else.
+  const distPath = isDevelopment
+    ? path.resolve(import.meta.dirname, "../..", "dist", "public")
+    : path.resolve(import.meta.dirname, "public");
+  const sendShell = registerSeoRoutes(app, { enabled: !isDevelopment, distPath });
 
   // development mode uses Vite, production mode uses static files
   if (isDevelopment) {
@@ -68,7 +71,10 @@ async function startServer() {
     const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    // The metadata handler *is* the single-page fallback. Handing it to
+    // serveStatic rather than mounting it earlier is what stops a route from
+    // silently bypassing it.
+    serveStatic(app, { distPath, sendShell });
   }
 
   const preferredPort = parseInt(process.env.PORT || "3000");

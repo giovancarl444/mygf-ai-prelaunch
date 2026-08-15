@@ -1,4 +1,4 @@
-import type { Express, Request } from "express";
+import type { Express, Request, RequestHandler } from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { getPublishedOhapiCharacterBySlug, listPublishedOhapiCharacters } from "./ohapiDb";
@@ -249,11 +249,34 @@ export async function renderSitemapXml(baseUrl: string) {
 }
 
 /**
- * Registers everything a crawler needs, ahead of the single-page catch-all.
+ * Registers the files a crawler asks for by name, and returns the handler that
+ * serves every HTML page.
  *
- * Order matters: the static handler answers `/` with the shell, so the HTML
- * routes have to be mounted before it or they never run.
+ * The returned handler replaces the single-page catch-all rather than sitting
+ * in front of it. An earlier version mounted `["/", "/companions",
+ * "/companion/:slug"]` explicitly and let everything else fall through to the
+ * static handler, which meant any route not on that list was served the
+ * unmodified shell — carrying no `robots` tag at all. `describePage` defaults
+ * those routes to `noindex`, and that default was unreachable in production for
+ * the entire time it existed.
+ *
+ * A list of routes to keep in sync is the bug. There is one HTML entry point
+ * now, and `describePage` decides what each path is told.
  */
+/**
+ * The path as the visitor asked for it.
+ *
+ * `req.path` is relative to where the handler is mounted, and this one is
+ * mounted as the catch-all — so `req.path` is `/` for every request that
+ * reaches it, and every page would be described as the landing page. A
+ * trailing slash is removed so `/companions/` is not a second URL with its own
+ * canonical.
+ */
+function requestedPathname(req: Request): string {
+  const raw = (req.originalUrl || req.url || "/").split(/[?#]/)[0];
+  return raw.length > 1 && raw.endsWith("/") ? raw.slice(0, -1) : raw || "/";
+}
+
 export function registerSeoRoutes(app: Express, options: { distPath: string; enabled: boolean }) {
   app.get("/robots.txt", (req, res) => {
     res.type("text/plain").send(renderRobotsTxt(resolveBaseUrl(req)));
@@ -269,18 +292,24 @@ export function registerSeoRoutes(app: Express, options: { distPath: string; ena
   });
 
   // In development Vite owns the HTML pipeline and search does not see it.
-  if (!options.enabled) return;
+  if (!options.enabled) return undefined;
+
+  // The static handler would otherwise answer this with the shell as a plain
+  // file, giving `/` a duplicate that carries no canonical pointing home.
+  app.get("/index.html", (_req, res) => res.redirect(301, "/"));
 
   const shellPath = path.resolve(options.distPath, "index.html");
-  app.get(["/", "/companions", "/companion/:slug"], async (req, res, next) => {
+  const sendShell: RequestHandler = async (req, res, next) => {
     try {
       const shell = await fs.promises.readFile(shellPath, "utf-8");
-      const meta = await describePage(req.path, resolveBaseUrl(req));
+      const meta = await describePage(requestedPathname(req), resolveBaseUrl(req));
       res.type("text/html").send(injectMeta(shell, meta));
     } catch (error) {
       // Never let metadata be the reason a page does not load.
       console.error("[SEO] Falling back to the unmodified shell:", error);
-      next();
+      next(error);
     }
-  });
+  };
+
+  return sendShell;
 }
