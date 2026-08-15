@@ -7,7 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerAuthRoutes } from "../auth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./static";
 import { registerSeoRoutes } from "../seo";
 import path from "path";
 
@@ -61,6 +61,11 @@ async function startServer() {
 
   // development mode uses Vite, production mode uses static files
   if (isDevelopment) {
+    // Loaded on demand, and kept out of the production bundle by the build.
+    // Vite is a development dependency and is absent from the server's install;
+    // as a static import Node would resolve it before running any of this and
+    // exit, which is precisely how the first deploy crash-looped.
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
     serveStatic(app);
