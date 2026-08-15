@@ -1,0 +1,25 @@
+# /etc/caddy/Caddyfile
+#
+# TLS is issued and renewed automatically, which is the entire reason Caddy is
+# here rather than nginx. Replace the hostname once the domain is registered.
+
+mygf.example.com {
+	encode zstd gzip
+
+	# Hashed asset filenames are immutable; the HTML shell is not, because the
+	# per-route metadata is written into it on every request.
+	@immutable path /assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	header /index.html Cache-Control "no-cache"
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# The provider's media is served from presigned S3 URLs, so those hosts
+		# have to be reachable for images, audio, and video to render.
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:3000
+}

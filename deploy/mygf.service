@@ -1,0 +1,35 @@
+# /etc/systemd/system/mygf.service
+#
+# The application, run as an unprivileged user and restarted on failure. The
+# environment file is read here rather than baked into the build, so rotating a
+# key is an edit and a restart instead of a release.
+
+[Unit]
+Description=MyGF.ai
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mygf
+Group=mygf
+WorkingDirectory=/srv/mygf/current
+EnvironmentFile=/srv/mygf/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=3
+
+# The process needs to read its own release directory and nothing else on the
+# box. If it is ever compromised, this is the difference between one directory
+# and the whole machine.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/mygf
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

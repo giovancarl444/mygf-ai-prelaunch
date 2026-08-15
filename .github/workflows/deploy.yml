@@ -1,0 +1,108 @@
+name: Deploy
+
+# Push to main is the deploy. Nothing is relayed through a person, and nothing
+# is built inside a hosting workspace we do not control — which is what made
+# every previous release a conversation instead of a push.
+on:
+  push:
+    branches: [main]
+  # Available by hand for a rollback: run this against an older commit.
+  workflow_dispatch:
+
+concurrency:
+  # Two deploys overlapping would interleave rsync with a service restart.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The same gates CI runs. A deploy that skips them is a deploy that
+      # ships the thing CI would have caught.
+      - name: Typecheck
+        run: pnpm check
+
+      - name: Test
+        run: pnpm test
+
+      # VITE_* values are read at build time and baked into the bundle, so they
+      # have to be present here rather than on the server. Everything else is
+      # read at runtime from the server's own environment file.
+      - name: Build
+        env:
+          VITE_APP_ID: ${{ secrets.VITE_APP_ID }}
+          VITE_OAUTH_PORTAL_URL: ${{ secrets.VITE_OAUTH_PORTAL_URL }}
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+          if grep "(!)" build.log | grep -qv "chunks are larger than"; then
+            echo "::error::The build emitted a correctness warning:"
+            grep "(!)" build.log | grep -v "chunks are larger than"
+            exit 1
+          fi
+
+      - name: Authorise the deploy key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pinned rather than trust-on-first-use: a changed host key should
+          # fail the deploy, not be accepted silently.
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      # Only the built output and what is needed to install runtime
+      # dependencies. Source, tests, and .env never leave the runner.
+      - name: Upload the build
+        run: |
+          rsync -az --delete \
+            -e "ssh -o BatchMode=yes" \
+            dist/ package.json pnpm-lock.yaml drizzle/ drizzle.config.ts \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/srv/mygf/incoming/"
+
+      - name: Install, migrate, and restart
+        run: |
+          ssh -o BatchMode=yes "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" 'bash -euo pipefail -s' <<'REMOTE'
+            cd /srv/mygf
+
+            # Keep the previous release so a rollback is a symlink move rather
+            # than a rebuild.
+            rm -rf previous && cp -a current previous 2>/dev/null || true
+            rm -rf current && mv incoming current
+
+            cd current
+            pnpm install --prod --frozen-lockfile
+
+            # Schema first. A server started against an older schema is the
+            # failure this ordering exists to prevent.
+            set -a && . /srv/mygf/.env && set +a
+            pnpm exec drizzle-kit migrate
+
+            sudo systemctl restart mygf
+            sleep 3
+            systemctl is-active --quiet mygf || { echo "service did not come back"; exit 1; }
+          REMOTE
+
+      - name: Confirm the site is answering
+        run: |
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "${{ secrets.PUBLIC_BASE_URL }}/robots.txt" || true)
+            if [ "$code" = "200" ]; then echo "Live."; exit 0; fi
+            echo "Attempt $attempt returned $code; retrying."
+            sleep 6
+          done
+          echo "::error::The site did not answer after the deploy."
+          exit 1
