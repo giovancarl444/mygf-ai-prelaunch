@@ -37,6 +37,11 @@ if (autoSave) {
  * Candidate matrix. Values match what the ops studio's draft schema sends:
  * free-text nationality/ethnicity/names/biography the provider interprets,
  * plus a birth date that keeps everyone at 21+.
+ *
+ * Ethnicity is validated against the provider's catalog
+ * (GET /api/v1/characters/ethnicities — 108 values, verified live); an
+ * unknown value is rejected with a 400 that still costs nothing but the
+ * attempt. Nationalities: GET /api/v1/characters/nationalities.
  */
 const archetypes = [
   {
@@ -48,11 +53,11 @@ const archetypes = [
     biography: "A flamenco-trained physiotherapist in Seville who argues passionately about food and thinks every problem looks smaller after a walk.",
   },
   {
-    firstName: "Yuki", lastName: "Tanaka", nationality: "Japanese", ethnicity: "East Asian",
+    firstName: "Yuki", lastName: "Tanaka", nationality: "Japanese", ethnicity: "Japanese",
     biography: "A midnight-shift illustrator in Osaka who collects vending-machine stories and falls asleep to rain sounds. Soft-spoken with a sharp sense of humor.",
   },
   {
-    firstName: "Maren", lastName: "Vogel", nationality: "German", ethnicity: "Central European",
+    firstName: "Maren", lastName: "Vogel", nationality: "German", ethnicity: "German",
     biography: "A structural engineer from Hamburg who bakes when she cannot sleep and explains the city's bridges with real enthusiasm. Pragmatic, warm, unexpectedly silly.",
   },
   {
