@@ -10,11 +10,21 @@ import {
   requestOhApiVideo,
 } from "./ohapi";
 import { providerFailure } from "./ohapiErrors";
-import { PHOTO_RESOLUTION, reconcileStaleJobs, submitMediaJob, USE_PROMPT_ENHANCEMENT } from "./ohapiMediaJobs";
+import {
+  HIGH_QUALITY_IMAGE_COST,
+  PHOTO_RESOLUTION,
+  PHOTO_RESOLUTION_HIGH,
+  reconcileStaleJobs,
+  submitMediaJob,
+  USE_PROMPT_ENHANCEMENT,
+} from "./ohapiMediaJobs";
+import { refundMediaSpendForJob } from "./billing";
+import { isGuestUser } from "./ohapiGuest";
 import {
   getChattableOhapiCharacter,
   getOwnedOhapiMediaJob,
   getOwnedOhapiRoom,
+  getUserById,
   listOwnedOhapiMediaJobs,
   updateOhapiMediaJob,
 } from "./ohapiDb";
@@ -34,8 +44,30 @@ export const ohapiMediaRouter = router({
   image: adultProcedure.input(z.object({
     worldSlug: worldSlugSchema,
     prompt: promptSchema,
+    /**
+     * Standard is the 720×1280 preset at the base credit price. High is a
+     * true 1080×1920 render (verified live 16 Aug 2026) at double credits —
+     * the provider's per-size cost is unpublished, so the surcharge is the
+     * conservative choice for the margin formula.
+     */
+    quality: z.enum(["standard", "high"]).default("standard"),
+    /** Default keeps the provider's enhancement on; the panel sends false. */
+    promptEnhancement: z.boolean().optional(),
   })).mutation(async ({ ctx, input }) => {
     const character = await requireCompanion(input.worldSlug);
+
+    // High quality is a member perk: guests see the standard photo, which is
+    // also the only quality the guest media budget was sized for.
+    if (input.quality === "high") {
+      const actor = await getUserById(ctx.user.id).catch(() => undefined);
+      if (!actor || isGuestUser(actor)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "High quality is a member feature. Create an account to unlock it.",
+        });
+      }
+    }
+
     const room = await getOwnedOhapiRoom({ userId: ctx.user.id, ohapiCharacterId: character.id });
     return submitMediaJob({
       userId: ctx.user.id,
@@ -43,13 +75,14 @@ export const ohapiMediaRouter = router({
       prompt: input.prompt,
       ohapiCharacterId: character.id,
       roomId: room?.id ?? null,
+      cost: input.quality === "high" ? HIGH_QUALITY_IMAGE_COST : undefined,
       submit: () => requestOhApiImage({
         characterId: character.providerCharacterId!,
         // The in-room flow gives the generation the conversation's context.
         roomId: room?.providerRoomId,
         prompt: input.prompt,
-        promptEnhancement: USE_PROMPT_ENHANCEMENT,
-        resolution: PHOTO_RESOLUTION,
+        promptEnhancement: input.promptEnhancement ?? USE_PROMPT_ENHANCEMENT,
+        resolution: input.quality === "high" ? PHOTO_RESOLUTION_HIGH : PHOTO_RESOLUTION,
         userGender: room?.userGender ?? undefined,
       }),
     });
@@ -137,6 +170,12 @@ export const ohapiMediaRouter = router({
         // The provider's failure text is not surfaced to the customer.
         errorMessage: nextStatus === "failed" ? "generation_failed" : null,
       });
+      // The credits went at submission; a generation the provider failed owes
+      // them back. Best effort — the poll answer must not depend on it.
+      if (nextStatus === "failed") {
+        await refundMediaSpendForJob({ userId: ctx.user.id, mediaJobId: job.id })
+          .catch(error => console.error("[Billing] A failure refund could not be recorded:", error));
+      }
     }
 
     return {

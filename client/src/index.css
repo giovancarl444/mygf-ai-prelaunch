@@ -1195,6 +1195,62 @@ p {
   line-height: 1.5;
 }
 
+/* Generation options: quality, enhancement, and the video source mode. */
+.media-mode-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.media-mode-row button {
+  flex: 1;
+  min-height: 32px;
+  padding: 0 10px;
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.media-mode-row button.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(255, 77, 141, 0.12);
+}
+
+.media-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.media-select {
+  height: 34px;
+  padding: 0 10px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  font-size: 11.5px;
+}
+
+.media-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.media-toggle input {
+  accent-color: var(--accent);
+}
+
 .media-result {
   margin-top: 14px;
   overflow: hidden;

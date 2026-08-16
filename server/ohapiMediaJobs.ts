@@ -14,7 +14,7 @@ import {
   updateOhapiMediaJob,
 } from "./ohapiDb";
 import { GUEST_LIMIT_REACHED, GUEST_MEDIA_LIMIT, isGuestUser } from "./ohapiGuest";
-import { authoriseMediaSpend, recordMediaSpend } from "./billing";
+import { authoriseMediaSpend, recordMediaSpend, refundMediaSpendForJob } from "./billing";
 
 /**
  * Let the provider expand the prompt with its own model.
@@ -22,7 +22,10 @@ import { authoriseMediaSpend, recordMediaSpend } from "./billing";
  * A customer types "send me a pic", not a description of a photograph, and no
  * template we write turns one into the other. The provider's own enhancement
  * has the character and the conversation to work from, which is more than a
- * fixed phrasing of ours ever will.
+ * fixed phrasing of ours ever will. (Live note, 16 Aug 2026: with a deliberate
+ * prompt from the generation panel, enhancement *off* ranked better and ran in
+ * ~32 s instead of ~48 s — which is why the panel exposes the toggle, default
+ * off, while this remains the default for conversation-sourced prompts.)
  */
 export const USE_PROMPT_ENHANCEMENT = true;
 
@@ -31,6 +34,15 @@ export const USE_PROMPT_ENHANCEMENT = true;
  * sends should be the shape of a photo taken on a phone.
  */
 export const PHOTO_RESOLUTION: OhApiResolution = "9:16";
+
+/**
+ * The high-quality option: a true 1080×1920 render (verified live 16 Aug 2026
+ * — presets are hard-capped at 1280 on the long edge, explicit sizes are not).
+ * Priced at two credits rather than one because the provider's per-size cost
+ * is unpublished; revisit alongside the MONETIZATION.md margin formula.
+ */
+export const PHOTO_RESOLUTION_HIGH: OhApiResolution = [1080, 1920];
+export const HIGH_QUALITY_IMAGE_COST = 2;
 
 /**
  * Charges one media attempt, runs the provider submission, and records the job
@@ -46,6 +58,8 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
   prompt: string;
   ohapiCharacterId?: number | null;
   roomId?: number | null;
+  /** What this generation costs when it is not the kind's base price. */
+  cost?: number;
   submit: () => Promise<T>;
 }) {
   // Every generation in the product goes through here, which is why the guest
@@ -63,7 +77,7 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
   // The two answer different questions: this one is "have they paid for this",
   // the next is "are they going too fast".
   const spend = actor
-    ? await authoriseMediaSpend({ user: actor, kind: input.kind }).catch(() => null)
+    ? await authoriseMediaSpend({ user: actor, kind: input.kind, costOverride: input.cost }).catch(() => null)
     : null;
   if (spend && !spend.allowed) {
     throw new TRPCError({
@@ -91,11 +105,14 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
   }
 
   // Charged only once the provider has accepted the work. Taking the credit
-  // before submission would bill for requests that never reached anyone.
-  if (spend?.allowed && spend.source !== "guest") {
-    await recordMediaSpend({ userId: input.userId, cost: spend.cost, note: spend.source })
+  // before submission would bill for requests that never reached anyone, and
+  // tying the charge to the job row is what lets a later failure refund
+  // exactly what this generation cost.
+  const chargeForJob = async (mediaJobId: number | null) => {
+    if (!spend?.allowed || spend.source === "guest") return;
+    await recordMediaSpend({ userId: input.userId, cost: spend.cost, mediaJobId, note: spend.source })
       .catch(error => console.error("[Billing] A spend could not be recorded:", error));
-  }
+  };
 
   // Audio is synchronous: it answers with the finished file and no job id, so
   // there is nothing to poll. It is recorded as already complete under a local
@@ -104,7 +121,7 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
   if (!submission.jobId) {
     if (!submission.presignedUrl) return providerFailure(new Error("The provider returned no result."));
     const localJobId = `local-${input.kind}-${randomUUID()}`;
-    await createOhapiMediaJob({
+    const job = await createOhapiMediaJob({
       userId: input.userId,
       ohapiCharacterId: input.ohapiCharacterId ?? null,
       roomId: input.roomId ?? null,
@@ -114,6 +131,7 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
       resultUrl: submission.presignedUrl,
       status: "completed",
     });
+    await chargeForJob(job?.id ?? null);
     return {
       jobId: localJobId,
       kind: input.kind,
@@ -125,7 +143,7 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
   // The submission's presigned URL points at an object that does not exist yet,
   // so it is deliberately not stored or returned. The result URL is recorded
   // only when the job reports completion.
-  await createOhapiMediaJob({
+  const job = await createOhapiMediaJob({
     userId: input.userId,
     ohapiCharacterId: input.ohapiCharacterId ?? null,
     roomId: input.roomId ?? null,
@@ -133,6 +151,7 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
     kind: input.kind,
     prompt: input.prompt,
   });
+  await chargeForJob(job?.id ?? null);
 
   return {
     jobId: submission.jobId,
@@ -167,6 +186,13 @@ export async function reconcileStaleJobs(userId: number) {
           followupText: status === "completed" ? state.followupText : null,
           errorMessage: status === "failed" ? "generation_failed" : null,
         });
+        // The charge happened at submission; a job the provider failed after
+        // accepting owes the customer their credits back. Best effort — this
+        // runs on a read path and must never break the gallery.
+        if (status === "failed") {
+          await refundMediaSpendForJob({ userId, mediaJobId: job.id })
+            .catch(error => console.error("[Billing] A failure refund could not be recorded:", error));
+        }
       } catch {
         // Leave it pending; the next gallery read will try again.
       }

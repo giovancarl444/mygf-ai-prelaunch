@@ -84,6 +84,7 @@ import {
   MEDIA_CREDIT_COST,
   PLANS,
   recordMediaSpend,
+  refundMediaSpendForJob,
   reversePayment,
   settlePayment,
 } from "./billing";
@@ -285,5 +286,51 @@ describe("money going back out", () => {
 
   it("ignores a reversal for a payment that never settled", async () => {
     expect(await reversePayment({ providerRef: "unknown" })).toEqual({ reversed: false });
+  });
+});
+
+describe("generation pricing and failure refunds", () => {
+  /**
+   * High-resolution images cost double (verified live 16 Aug 2026: explicit
+   * sizes are honoured where presets are capped). The override is the caller's
+   * arithmetic — a customer never names a price.
+   */
+  it("authorises and charges a cost override at its own price", async () => {
+    store.ledger.push({ userId: member.id, delta: 10, reason: "purchase", createdAt: new Date() } as never);
+
+    const spend = await authoriseMediaSpend({ user: member, kind: "image", costOverride: 2 });
+    expect(spend).toMatchObject({ allowed: true, cost: 2 });
+
+    await recordMediaSpend({ userId: member.id, cost: spend.cost, mediaJobId: 55, note: spend.source });
+    expect(store.ledger.at(-1)).toMatchObject({ userId: member.id, delta: -2, reason: "spend", mediaJobId: 55 });
+    expect(await getCreditBalance(member.id)).toBe(8);
+  });
+
+  it("falls back to the kind's base price when no override is given", async () => {
+    store.ledger.push({ userId: member.id, delta: 10, reason: "purchase", createdAt: new Date() } as never);
+    const spend = await authoriseMediaSpend({ user: member, kind: "image" });
+    expect(spend.cost).toBe(MEDIA_CREDIT_COST.image);
+  });
+
+  /**
+   * Charged at submission, refunded when the provider later fails the job —
+   * once, no matter how many times the failure is polled past.
+   */
+  it("refunds exactly the spend entries tied to a failed job, once", async () => {
+    await recordMediaSpend({ userId: member.id, cost: 2, mediaJobId: 77, note: "credits" });
+
+    const first = await refundMediaSpendForJob({ userId: member.id, mediaJobId: 77 });
+    expect(first).toEqual({ refunded: true, credits: 2 });
+
+    const second = await refundMediaSpendForJob({ userId: member.id, mediaJobId: 77 });
+    expect(second).toEqual({ refunded: false, credits: 0 });
+
+    expect(await getCreditBalance(member.id)).toBe(0);
+    expect(store.ledger.filter(entry => entry.reason === "refund")).toHaveLength(1);
+  });
+
+  it("does not refund a job that was never charged", async () => {
+    expect(await refundMediaSpendForJob({ userId: member.id, mediaJobId: 999 }))
+      .toEqual({ refunded: false, credits: 0 });
   });
 });

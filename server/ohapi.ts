@@ -341,12 +341,22 @@ function readJobSubmission(body: unknown): OhApiJobSubmission {
 }
 
 /**
- * Output shapes the provider documents, and the sizes they map to:
+ * Output shapes the provider documents, and the sizes the presets map to:
  * 9:16 → 720×1280, 16:9 → 1280×720, 1:1 → 1024×1024, 4:3 → 960×720,
- * 3:4 → 720×960. An explicit [width, height] array is also accepted; only the
- * presets are offered here because their limits are known.
+ * 3:4 → 720×960. An explicit [width, height] array is also accepted —
+ * verified live on 16 Aug 2026: `[1080, 1920]` returns true 1080×1920
+ * output where every preset is capped at 1280 on its long edge. The cost in
+ * provider credits per size is not published, which is why the product keeps
+ * presets as the default and offers the explicit size deliberately.
  */
-export type OhApiResolution = "9:16" | "16:9" | "1:1" | "4:3" | "3:4";
+export type OhApiResolution = "9:16" | "16:9" | "1:1" | "4:3" | "3:4" | [number, number];
+
+/** True when an explicit size is a shape the provider has been seen to honour. */
+export function isExplicitResolution(resolution: OhApiResolution): resolution is [number, number] {
+  return Array.isArray(resolution)
+    && resolution.length === 2
+    && resolution.every(side => Number.isInteger(side) && side >= 128 && side <= 2048);
+}
 
 /**
  * POST /api/v1/images

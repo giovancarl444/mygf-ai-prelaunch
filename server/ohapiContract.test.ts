@@ -191,6 +191,26 @@ describe("verified OhAPI request contract", () => {
   });
 
   /**
+   * Verified live on 16 Aug 2026 with a partner key: `resolution:
+   * [1080, 1920]` is accepted and returns true 1080×1920 output, while every
+   * preset is capped at 1280 on its long edge. The array is sent as-is.
+   */
+  it("sends an explicit [width, height] resolution as an array", async () => {
+    respondWith({ job_id: "job-hd" });
+    await requestOhApiImage({
+      characterId: "char-1",
+      prompt: "a portrait",
+      resolution: [1080, 1920],
+    });
+
+    expect(lastRequest().body).toEqual({
+      character_id: "char-1",
+      prompt: "a portrait",
+      resolution: [1080, 1920],
+    });
+  });
+
+  /**
    * These fields are documented rather than observed, and this documentation
    * has been wrong before. A rejection on shape must not cost the customer the
    * photo they asked for.

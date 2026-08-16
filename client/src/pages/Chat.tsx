@@ -76,6 +76,13 @@ export default function Chat() {
   const [mediaTab, setMediaTab] = useState<MediaTab>("image");
   const [mediaPrompt, setMediaPrompt] = useState("");
   const [mediaOpen, setMediaOpen] = useState(false);
+  // Generation options: panel prompts are deliberate, so enhancement is off
+  // by default (ranked better and ~50% faster in the 16 Aug live comparison),
+  // and photos can be requested at double resolution for double credits.
+  const [enhancePrompt, setEnhancePrompt] = useState(false);
+  const [imageQuality, setImageQuality] = useState<"standard" | "high">("standard");
+  const [videoMode, setVideoMode] = useState<"text" | "image">("text");
+  const [videoSourceUrl, setVideoSourceUrl] = useState("");
   const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
   const [clearArmed, setClearArmed] = useState(false);
@@ -260,6 +267,15 @@ export default function Chat() {
     void utils.chat.history.invalidate();
   }, [settledJobId, utils]);
 
+  // The freshest completed photos, as source candidates for image-to-video.
+  const galleryImages = useMemo(
+    () => (gallery.data ?? []).flatMap(item =>
+      item.kind === "image" && item.resultUrl
+        ? [{ jobId: item.jobId, resultUrl: item.resultUrl, prompt: item.prompt }]
+        : []),
+    [gallery.data],
+  );
+
   const mediaBusy = imageJob.isPending || audioJob.isPending || videoJob.isPending
     || (Boolean(activeJob) && jobStatus.data?.status === "pending");
 
@@ -274,9 +290,16 @@ export default function Chat() {
   const submitMedia = () => {
     const prompt = mediaPrompt.trim();
     if (!prompt || !slug || mediaBusy) return;
-    if (mediaTab === "image") imageJob.mutate({ worldSlug: slug, prompt });
-    else if (mediaTab === "audio") audioJob.mutate({ worldSlug: slug, text: prompt });
-    else videoJob.mutate({ worldSlug: slug, prompt });
+    if (mediaTab === "image") {
+      imageJob.mutate({ worldSlug: slug, prompt, quality: imageQuality, promptEnhancement: enhancePrompt });
+    } else if (mediaTab === "audio") {
+      audioJob.mutate({ worldSlug: slug, text: prompt });
+    } else if (videoMode === "image") {
+      if (!videoSourceUrl) return;
+      videoJob.mutate({ imageUrl: videoSourceUrl, prompt, promptEnhancement: enhancePrompt });
+    } else {
+      videoJob.mutate({ worldSlug: slug, prompt, promptEnhancement: enhancePrompt });
+    }
   };
 
   /* ---------------------------------------------------------------------- */
@@ -706,14 +729,80 @@ export default function Chat() {
                       ? "A photo of her in a quiet bar at night…"
                       : mediaTab === "audio"
                         ? "Say something only I would understand."
-                        : "She turns toward the camera and smiles…"
+                        : videoMode === "image"
+                          ? "Describe how the photo should move…"
+                          : "She turns toward the camera and smiles…"
                   }
                 />
+
+                {mediaTab === "video" && (
+                  <div className="media-mode-row" role="group" aria-label="Video source">
+                    <button
+                      type="button"
+                      className={videoMode === "text" ? "active" : undefined}
+                      onClick={() => setVideoMode("text")}
+                    >
+                      From a scene
+                    </button>
+                    <button
+                      type="button"
+                      className={videoMode === "image" ? "active" : undefined}
+                      onClick={() => setVideoMode("image")}
+                    >
+                      From a photo
+                    </button>
+                  </div>
+                )}
+
+                {mediaTab === "video" && videoMode === "image" && (
+                  galleryImages.length > 0 ? (
+                    <select
+                      className="media-select"
+                      value={videoSourceUrl}
+                      onChange={event => setVideoSourceUrl(event.target.value)}
+                      aria-label="Source photo"
+                    >
+                      <option value="">Pick one of your photos…</option>
+                      {galleryImages.map(item => (
+                        <option key={item.jobId} value={item.resultUrl}>
+                          {(item.prompt ?? "Earlier photo").slice(0, 60)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="media-hint">Generate a photo first — it becomes the first frame of the video.</p>
+                  )
+                )}
+
+                {mediaTab !== "audio" && (
+                  <div className="media-options">
+                    {mediaTab === "image" && (
+                      <select
+                        className="media-select"
+                        value={imageQuality}
+                        onChange={event => setImageQuality(event.target.value as "standard" | "high")}
+                        aria-label="Photo quality"
+                      >
+                        <option value="standard">Standard · 1 credit</option>
+                        <option value="high">High · 1080×1920 · 2 credits</option>
+                      </select>
+                    )}
+                    <label className="media-toggle">
+                      <input
+                        type="checkbox"
+                        checked={enhancePrompt}
+                        onChange={event => setEnhancePrompt(event.target.checked)}
+                      />
+                      Let the provider expand my prompt
+                    </label>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   className="primary-button media-submit"
                   onClick={submitMedia}
-                  disabled={!mediaPrompt.trim() || mediaBusy}
+                  disabled={!mediaPrompt.trim() || mediaBusy || (mediaTab === "video" && videoMode === "image" && !videoSourceUrl)}
                 >
                   {mediaBusy ? <Loader2 className="animate-spin" size={15} /> : <Sparkles size={15} />}
                   {mediaBusy ? "Generating…" : `Generate ${mediaTab === "image" ? "photo" : mediaTab === "audio" ? "voice note" : "video"}`}

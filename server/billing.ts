@@ -244,9 +244,15 @@ export type MediaSpend =
 export async function authoriseMediaSpend(input: {
   user: { id: number; openId: string };
   kind: "image" | "audio" | "video";
+  /**
+   * What this particular generation costs, when it differs from the kind's
+   * base price — today only high-resolution images. Unset means the base
+   * price; the override is computed by the caller, never by the customer.
+   */
+  costOverride?: number;
   now?: Date;
 }): Promise<MediaSpend> {
-  const cost = MEDIA_CREDIT_COST[input.kind];
+  const cost = input.costOverride ?? MEDIA_CREDIT_COST[input.kind];
   const entitlements = await resolveEntitlements(input.user, input.now);
 
   if (entitlements.isGuest) {
@@ -276,6 +282,41 @@ export async function recordMediaSpend(input: {
     mediaJobId: input.mediaJobId ?? null,
     note: input.note ?? null,
   });
+}
+
+/**
+ * Returns what a generation cost when the provider later fails it.
+ *
+ * Charged at submission, refunded at failure — the customer should not pay for
+ * work that never produced anything. Refunds exactly the spend entries tied to
+ * the media job, once: a job that fails is polled past its failure more than
+ * once, and each poll would otherwise refund again.
+ */
+export async function refundMediaSpendForJob(input: {
+  userId: number;
+  mediaJobId: number;
+  note?: string;
+}): Promise<{ refunded: boolean; credits: number }> {
+  const db = await requireDb();
+  const entries = await db.select({ delta: creditLedger.delta, reason: creditLedger.reason })
+    .from(creditLedger)
+    .where(and(eq(creditLedger.mediaJobId, input.mediaJobId), eq(creditLedger.userId, input.userId)));
+
+  const charged = entries
+    .filter(entry => entry.reason === "spend")
+    .reduce((sum, entry) => sum + Math.abs(Number(entry.delta)), 0);
+  if (!charged || entries.some(entry => entry.reason === "refund")) {
+    return { refunded: false, credits: 0 };
+  }
+
+  await db.insert(creditLedger).values({
+    userId: input.userId,
+    delta: charged,
+    reason: "refund",
+    mediaJobId: input.mediaJobId,
+    note: input.note ?? "generation_failed",
+  });
+  return { refunded: true, credits: charged };
 }
 
 /* -------------------------------------------------------------------------- */
