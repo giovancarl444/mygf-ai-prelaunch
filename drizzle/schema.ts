@@ -257,6 +257,21 @@ export const ohapiAdminAudits = mysqlTable("ohapi_admin_audits", {
   createdIndex: index("ohapi_admin_audits_created_index").on(table.createdAt),
 }));
 
+/**
+ * A member's saved companions. One row per (member, companion): saving twice
+ * is the same state as saving once, and the pair is unique at the database
+ * level so concurrent toggles cannot produce duplicates.
+ */
+export const ohapiSavedCompanions = mysqlTable("ohapi_saved_companions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  ohapiCharacterId: int("ohapiCharacterId").notNull().references(() => ohapiCharacters.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  userCompanionUnique: uniqueIndex("ohapi_saved_companions_user_companion_unique").on(table.userId, table.ohapiCharacterId),
+  userCreatedIndex: index("ohapi_saved_companions_user_created_index").on(table.userId, table.createdAt),
+}));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type BetaInterest = typeof betaInterests.$inferSelect;
@@ -267,6 +282,8 @@ export type CreditLedgerEntry = typeof creditLedger.$inferSelect;
 export type InsertCreditLedgerEntry = typeof creditLedger.$inferInsert;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = typeof payments.$inferInsert;
+export type SavedCompanion = typeof ohapiSavedCompanions.$inferSelect;
+export type InsertSavedCompanion = typeof ohapiSavedCompanions.$inferInsert;
 export type AuthLoginToken = typeof authLoginTokens.$inferSelect;
 export type InsertAuthLoginToken = typeof authLoginTokens.$inferInsert;
 export type OhapiCharacter = typeof ohapiCharacters.$inferSelect;

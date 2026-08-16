@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { billingRouter } from "./billingRouter";
 import { ohapiChatRouter } from "./ohapiChat";
+import { ohapiCollectionRouter } from "./ohapiCollection";
 import { ohapiCompanionsRouter } from "./ohapiCompanions";
 import { ohapiMediaRouter } from "./ohapiMedia";
 import { ohapiStudioRouter } from "./ohapiStudio";
@@ -26,6 +27,8 @@ export const appRouter = router({
   }),
   // Public discovery: every listed companion is one the provider can actually open.
   companions: ohapiCompanionsRouter,
+  // A member's saved companions, in the database rather than the browser.
+  collection: ohapiCollectionRouter,
   // Account-owned conversation and generation.
   chat: ohapiChatRouter,
   media: ohapiMediaRouter,

@@ -7,6 +7,7 @@ import {
   ohapiRateLimits,
   ohapiReports,
   ohapiRooms,
+  ohapiSavedCompanions,
   users,
   type OhapiCharacter,
 } from "../drizzle/schema";
@@ -74,6 +75,43 @@ export async function getOhapiCharacterBySlug(worldSlug: string) {
   const rows = await db.select().from(ohapiCharacters)
     .where(eq(ohapiCharacters.worldSlug, worldSlug)).limit(1);
   return rows[0];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Saved companions                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** The member's saved companions as world slugs, newest first. */
+export async function listSavedOhapiCharacterSlugs(userId: number): Promise<string[]> {
+  const db = await requireDb();
+  const rows = await db.select({ worldSlug: ohapiCharacters.worldSlug })
+    .from(ohapiSavedCompanions)
+    .innerJoin(ohapiCharacters, eq(ohapiSavedCompanions.ohapiCharacterId, ohapiCharacters.id))
+    .where(eq(ohapiSavedCompanions.userId, userId))
+    .orderBy(desc(ohapiSavedCompanions.createdAt));
+  return rows.map(row => row.worldSlug);
+}
+
+/** Idempotent save: the unique pair makes a second insert a no-op. */
+export async function saveOhapiCharacterForUser(userId: number, ohapiCharacterId: number) {
+  const db = await requireDb();
+  await db.insert(ohapiSavedCompanions).values({ userId, ohapiCharacterId })
+    .onDuplicateKeyUpdate({ set: { userId } });
+}
+
+export async function unsaveOhapiCharacterForUser(userId: number, ohapiCharacterId: number) {
+  const db = await requireDb();
+  await db.delete(ohapiSavedCompanions)
+    .where(and(eq(ohapiSavedCompanions.userId, userId), eq(ohapiSavedCompanions.ohapiCharacterId, ohapiCharacterId)));
+}
+
+export async function isOhapiCharacterSavedByUser(userId: number, ohapiCharacterId: number) {
+  const db = await requireDb();
+  const rows = await db.select({ id: ohapiSavedCompanions.id })
+    .from(ohapiSavedCompanions)
+    .where(and(eq(ohapiSavedCompanions.userId, userId), eq(ohapiSavedCompanions.ohapiCharacterId, ohapiCharacterId)))
+    .limit(1);
+  return rows.length > 0;
 }
 
 export type SyncCharacterInput = {
