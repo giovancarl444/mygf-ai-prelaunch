@@ -1,116 +1,160 @@
-import { AppFooter } from "@/components/AppFooter";
-import { AppHeader } from "@/components/AppHeader";
+import { portraitFallbackLabel, providerTypeLabel } from "@/components/discovery/DiscoveryCard";
+import RouteShell from "@/components/discovery/RouteShell";
+import { useSavedProfiles } from "@/components/discovery/useSavedProfiles";
 import { trpc } from "@/lib/trpc";
-import {
-  ArrowLeft,
-  ImageIcon,
-  Info,
-  Loader2,
-  MessageCircle,
-  Mic,
-  UserRound,
-  Video,
-} from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, ChevronRight, Info, Loader2, MessageCircle, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { Link, useRoute } from "wouter";
-
-const capabilities = [
-  { icon: MessageCircle, title: "Chat", copy: "A private thread that remembers the conversation you are having." },
-  { icon: ImageIcon, title: "Photos", copy: "Ask for an image and she generates it in her own likeness." },
-  { icon: Mic, title: "Voice", copy: "Turn any line into a voice note from her." },
-  { icon: Video, title: "Video", copy: "Describe a short scene and receive a generated clip." },
-];
+import "./discovery.css";
 
 export default function Companion() {
   const [, params] = useRoute("/companion/:slug");
   const slug = params?.slug ?? "";
   const companion = trpc.companions.bySlug.useQuery({ worldSlug: slug }, { enabled: Boolean(slug) });
+  const others = trpc.companions.list.useQuery();
+  const { isSaved, toggle } = useSavedProfiles();
+  const [tab, setTab] = useState<"Story" | "Details">("Story");
 
   if (companion.isLoading) {
     return (
-      <div className="app-shell">
-        <AppHeader />
-        <main className="page-loading"><Loader2 className="animate-spin" size={22} /> Loading her profile…</main>
-      </div>
+      <RouteShell active="profile" eyebrow="CHARACTER PROFILE">
+        <section className="route-unavailable">
+          <Loader2 size={28} className="animate-spin" />
+          <p>LOADING PROFILE</p>
+        </section>
+      </RouteShell>
     );
   }
 
-  if (!companion.data) {
+  const profile = companion.data;
+
+  if (!profile) {
     return (
-      <div className="app-shell">
-        <AppHeader />
-        <main className="page">
-          <div className="empty-state" style={{ marginTop: 60 }}>
-            <UserRound size={26} />
-            <h3>She is not available</h3>
-            <p>This companion is not published right now. Browse the ones who are.</p>
-            <Link href="/companions" className="primary-button">See who is available</Link>
-          </div>
-        </main>
-        <AppFooter />
-      </div>
+      <RouteShell active="profile" eyebrow="CHARACTER PROFILE">
+        <section className="route-unavailable">
+          <Sparkles size={28} />
+          <p>PROFILE NOT AVAILABLE</p>
+          <h1>She is not published right now.</h1>
+          <Link href="/companions">Return to discovery</Link>
+        </section>
+      </RouteShell>
     );
   }
 
-  const her = companion.data;
+  const saved = isSaved(profile.worldSlug);
+  const chip = providerTypeLabel(profile.providerType);
+  const details = [
+    profile.occupation,
+    chip,
+    "Text, photos, voice notes, and video in one thread",
+    "Adults only — her thread opens after sign-in and adult confirmation",
+  ].filter((entry): entry is string => Boolean(entry));
 
   return (
-    <div className="app-shell">
-      <AppHeader />
-
-      <main className="page">
-        <Link href="/companions" className="companion-cta" style={{ marginTop: 24 }}>
-          <ArrowLeft size={14} /> All companions
-        </Link>
-
-        <div className="profile">
-          <div className="profile-portrait">
-            {her.profileImageUrl
-              ? <img src={her.profileImageUrl} alt={`${her.displayName}, an AI companion`} />
-              : <div className="companion-portrait-fallback" style={{ aspectRatio: "3 / 4" }}><UserRound size={48} /></div>}
+    <RouteShell active="profile" eyebrow="CHARACTER PROFILE">
+      <section className="profile-page">
+        <div className="profile-hero-card">
+          <div className="profile-hero-visual">
+            {profile.profileImageUrl
+              ? <img src={profile.profileImageUrl} alt={`${profile.displayName}, an AI companion`} />
+              : <div className="portrait-fallback" aria-hidden="true">{portraitFallbackLabel(profile.displayName)}</div>}
+            <div className="profile-hero-fade" />
+            {chip && <span className="profile-state-chip"><Sparkles size={11} />{chip}</span>}
           </div>
-
-          <div>
+          <div className="profile-hero-copy">
+            <p className="profile-kicker">PRIVATE AI COMPANION</p>
             <h1>
-              {her.displayName}
-              {her.age !== null && <span>{her.age}</span>}
+              {profile.displayName}
+              {profile.age !== null && <span> {profile.age}</span>}
             </h1>
-            {her.occupation && <p className="profile-occupation">{her.occupation}</p>}
-            <p className="profile-tagline">
-              {her.tagline ?? `Start a private conversation with ${her.displayName}. She replies in her own voice, and you can ask her for photos, voice notes, and video as you go.`}
-            </p>
-
+            {profile.tagline && <p>{profile.tagline}</p>}
+            <div className="profile-hero-meta">
+              <span><Check size={13} /> Available to talk</span>
+              <span><MessageCircle size={13} /> Text, photos, voice, video</span>
+            </div>
             <div className="profile-actions">
-              <Link href={`/chat/${her.worldSlug}`} className="primary-button large">
-                <MessageCircle size={17} /> Chat with {her.displayName.split(" ")[0]}
+              <button className={`profile-save-action ${saved ? "saved" : ""}`} onClick={() => toggle(profile.worldSlug)}>
+                {saved ? <BookmarkCheck size={16} fill="currentColor" /> : <Bookmark size={16} />}
+                {saved ? "Saved to collection" : "Save profile"}
+              </button>
+              <Link href={`/chat/${profile.worldSlug}`} className="profile-chat-action">
+                <MessageCircle size={17} />Start a chat
               </Link>
             </div>
-
-            <div className="capability-grid">
-              {capabilities.map(capability => {
-                const Icon = capability.icon;
-                return (
-                  <article key={capability.title} className="capability">
-                    <Icon size={19} />
-                    <strong>{capability.title}</strong>
-                    <p>{capability.copy}</p>
-                  </article>
-                );
-              })}
-            </div>
-
-            <p className="disclosure">
+            <p className="profile-disclosure">
               <Info size={16} />
               <span>
-                {her.displayName} is an AI companion, not a real person. Conversations and
-                generated media are produced by a model. This is an adult experience and is
-                not therapy or a substitute for human support.
+                {profile.displayName} is an AI companion, not a real person. Conversations and generated media
+                are produced by a model. This is an adult experience and is not therapy or a substitute for
+                human support.
               </span>
             </p>
           </div>
         </div>
-      </main>
 
-      <AppFooter />
-    </div>
+        <div className="profile-content-grid">
+          <div className="profile-editorial">
+            <div className="profile-tabs" role="tablist">
+              {(["Story", "Details"] as const).map(item => (
+                <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
+                  {item}
+                </button>
+              ))}
+            </div>
+            {tab === "Story" ? (
+              <article className="profile-prose">
+                <p className="profile-dropcap">
+                  {profile.occupation
+                    ? `${profile.displayName} is ${/^[aeiou]/i.test(profile.occupation) ? "an" : "a"} ${profile.occupation}.`
+                    : `This is ${profile.displayName}.`}
+                  {" "}Open a thread and let the conversation find its own pace.
+                </p>
+                <p>
+                  There is an easy rhythm to getting to know {profile.displayName}. Start with something small — a
+                  place you want to revisit, a question you are turning over — and let the exchange build from
+                  there. She keeps her own voice through the thread, and you can ask her for a photo, a voice
+                  note, or a short video without leaving the conversation.
+                </p>
+                <div className="profile-quote">“Good conversations make the familiar feel new again.”</div>
+              </article>
+            ) : (
+              <div className="profile-details-list">
+                {details.map(detail => (
+                  <div key={detail}><span><Check size={15} /></span><p>{detail}</p></div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <aside className="profile-aside">
+            <div className="profile-aside-card">
+              <p>CONVERSATION STARTERS</p>
+              <Link href={`/chat/${profile.worldSlug}`}>What made today memorable?<ChevronRight size={16} /></Link>
+              <Link href={`/chat/${profile.worldSlug}`}>What are you curious about lately?<ChevronRight size={16} /></Link>
+              <Link href={`/chat/${profile.worldSlug}`}>Tell me about your day.<ChevronRight size={16} /></Link>
+            </div>
+
+            {(others.data?.filter(candidate => candidate.worldSlug !== profile.worldSlug).length ?? 0) > 0 && (
+              <div className="profile-aside-card">
+                <p>DISCOVER MORE</p>
+                <div className="mini-profile-grid">
+                  {others.data
+                    ?.filter(candidate => candidate.worldSlug !== profile.worldSlug)
+                    .slice(0, 3)
+                    .map(candidate => (
+                      <Link href={`/companion/${candidate.worldSlug}`} key={candidate.worldSlug}>
+                        {candidate.profileImageUrl
+                          ? <img src={candidate.profileImageUrl} alt={candidate.displayName} />
+                          : <div className="mini-fallback">{portraitFallbackLabel(candidate.displayName)}</div>}
+                        <span>{candidate.displayName}</span>
+                      </Link>
+                    ))}
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
+      </section>
+    </RouteShell>
   );
 }

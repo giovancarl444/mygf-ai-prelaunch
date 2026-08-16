@@ -7,6 +7,7 @@ import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Chat from "./pages/Chat";
+import Collection from "./pages/Collection";
 import Companion from "./pages/Companion";
 import Companions from "./pages/Companions";
 import Home from "./pages/Home";
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/companions" component={Companions} />
       <Route path="/companion/:slug" component={Companion} />
+      <Route path="/collection" component={Collection} />
       <Route path="/signin" component={SignIn} />
         <Route path="/chat" component={Chat} />
       <Route path="/chat/:slug" component={Chat} />

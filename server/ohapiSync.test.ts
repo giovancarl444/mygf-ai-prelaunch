@@ -95,18 +95,20 @@ describe("allowance refunds", () => {
 });
 
 /**
- * Home renders four across on a wide screen. Five to seven featured cards would
- * strand one on its own row, which reads as a rendering fault rather than a
- * design choice.
+ * Home renders three across on a wide screen (four only at 1480px+). A count
+ * that is not a multiple of three would strand cards on their own row, which
+ * reads as a rendering fault rather than a design choice. Updated with the
+ * discovery redesign (M1); the property itself is unchanged.
  */
 describe("featured grid balance", () => {
-  it("never leaves a single card stranded on a second row", () => {
+  it("never leaves a stranded partial row", () => {
     expect(balancedFeaturedCount(0)).toBe(0);
+    expect(balancedFeaturedCount(2)).toBe(2);
     expect(balancedFeaturedCount(3)).toBe(3);
-    expect(balancedFeaturedCount(4)).toBe(4);
-    expect(balancedFeaturedCount(5)).toBe(4);
-    expect(balancedFeaturedCount(7)).toBe(4);
-    expect(balancedFeaturedCount(8)).toBe(8);
-    expect(balancedFeaturedCount(40)).toBe(8);
+    expect(balancedFeaturedCount(4)).toBe(3);
+    expect(balancedFeaturedCount(5)).toBe(3);
+    expect(balancedFeaturedCount(7)).toBe(6);
+    expect(balancedFeaturedCount(8)).toBe(6);
+    expect(balancedFeaturedCount(40)).toBe(9);
   });
 });

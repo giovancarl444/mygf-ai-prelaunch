@@ -155,6 +155,15 @@ export async function describePage(pathname: string, baseUrl: string): Promise<P
     };
   }
 
+  // A visitor's saved collection is personal state, never a public page.
+  if (pathname === "/collection") {
+    return {
+      ...base,
+      title: `Your collection — ${SITE_NAME}`,
+      noindex: true,
+    };
+  }
+
   // Conversations, the studio, and anything unrecognised. A customer's thread
   // being indexed would be a serious privacy failure, so the default is out.
   return { ...base, noindex: true };
