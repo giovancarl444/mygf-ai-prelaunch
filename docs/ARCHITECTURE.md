@@ -84,9 +84,22 @@ Findings from the 16 August live test session (partner key, character
 - **M0** — this document.
 - **M1** — Candy discovery design ported to `/`, `/companions`,
   `/companion/:slug`, new `/collection` (frontend only, real data via
-  `companions.list` / `companions.bySlug`).
+  `companions.list` / `companions.bySlug`). ✅ Built.
+- **M3** — Crypto payment rail + `/pricing`. ✅ **Built and tested — activation
+  is a pinned TODO for a while before launch** (owner decisions, not code):
+  1. Create the NOWPayments account; set `PAYMENTS_PROVIDER=nowpayments`,
+     `PAYMENTS_API_KEY`, `PAYMENTS_IPN_SECRET` in the production env.
+  2. **Apply for a card rail (CCBill or Epoch) now** — underwriting takes
+     weeks, so the clock starts today. The checkout abstraction is ready for
+     the second rail.
+  3. Live smoke test of the whole funnel (checkout → webhook → active plan)
+     against the production database before opening the doors.
+- **M3.5 — Generation at 100% (active focus).** Every generation surface
+  audited against the verified live-API findings: image quality/resolution
+  through the pipeline, video (text and image modes), voice, chat texting
+  styles, prompt handling, and credit costs documented against the margin
+  formula. Includes batch character creation tooling.
 - **M2** — Collection persistence in the database.
-- **M3** — Pricing pages + a connected payment rail.
 - **M4** — Own media storage (copy-on-complete in the media job flow).
 - **M5** — Chat surface restyle to the discovery design language.
 - **M6** — User-facing character creator (attributes from the provider
