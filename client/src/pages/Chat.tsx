@@ -421,7 +421,7 @@ export default function Chat() {
                     : <span className="companion-portrait-fallback"><UserRound size={18} /></span>}
                 </Link>
                 <div style={{ minWidth: 0 }}>
-                  <h2>{her.displayName}</h2>
+                  <h2 className="chat-companion-name">{her.displayName}</h2>
                   <p className="chat-subtitle">AI companion{her.occupation ? ` · ${her.occupation}` : ""}</p>
                 </div>
                 <div className="chat-head-actions">
