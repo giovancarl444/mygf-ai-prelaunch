@@ -15,6 +15,7 @@ import {
 } from "./ohapiDb";
 import { GUEST_LIMIT_REACHED, GUEST_MEDIA_LIMIT, isGuestUser } from "./ohapiGuest";
 import { authoriseMediaSpend, recordMediaSpend, refundMediaSpendForJob } from "./billing";
+import { copyMediaResult } from "./mediaStorage";
 
 /**
  * Let the provider expand the prompt with its own model.
@@ -117,10 +118,18 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
   // Audio is synchronous: it answers with the finished file and no job id, so
   // there is nothing to poll. It is recorded as already complete under a local
   // identifier, which keeps one shape — a media job — for everything the
-  // gallery, the transcript, and the ownership checks have to handle.
+  // gallery, the transcript, and the ownership checks have to handle. The
+  // copy to durable storage happens here too: this is the only completion
+  // moment a synchronous result ever gets.
   if (!submission.jobId) {
     if (!submission.presignedUrl) return providerFailure(new Error("The provider returned no result."));
     const localJobId = `local-${input.kind}-${randomUUID()}`;
+    const durableUrl = await copyMediaResult({
+      sourceUrl: submission.presignedUrl,
+      userId: input.userId,
+      kind: input.kind,
+      providerJobId: localJobId,
+    });
     const job = await createOhapiMediaJob({
       userId: input.userId,
       ohapiCharacterId: input.ohapiCharacterId ?? null,
@@ -128,7 +137,7 @@ export async function submitMediaJob<T extends { jobId: string | null; presigned
       providerJobId: localJobId,
       kind: input.kind,
       prompt: input.prompt,
-      resultUrl: submission.presignedUrl,
+      resultUrl: durableUrl ?? submission.presignedUrl,
       status: "completed",
     });
     await chargeForJob(job?.id ?? null);
@@ -179,10 +188,21 @@ export async function reconcileStaleJobs(userId: number) {
         const state = await getOhApiJobStatus(job.providerJobId);
         const status = classifyOhApiJob(state);
         if (status === "pending") return;
+        // Same race as the poll path: copy the bytes to durable storage when
+        // the result has just landed, before the provider's link expires.
+        let durableUrl: string | null = null;
+        if (status === "completed" && state.presignedUrl) {
+          durableUrl = await copyMediaResult({
+            sourceUrl: state.presignedUrl,
+            userId,
+            kind: job.kind,
+            providerJobId: job.providerJobId,
+          });
+        }
         await updateOhapiMediaJob({
           id: job.id,
           status,
-          resultUrl: state.presignedUrl,
+          resultUrl: durableUrl ?? state.presignedUrl,
           followupText: status === "completed" ? state.followupText : null,
           errorMessage: status === "failed" ? "generation_failed" : null,
         });

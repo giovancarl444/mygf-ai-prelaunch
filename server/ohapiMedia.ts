@@ -19,6 +19,7 @@ import {
   USE_PROMPT_ENHANCEMENT,
 } from "./ohapiMediaJobs";
 import { refundMediaSpendForJob } from "./billing";
+import { copyMediaResult } from "./mediaStorage";
 import { isGuestUser } from "./ohapiGuest";
 import {
   getChattableOhapiCharacter,
@@ -161,11 +162,24 @@ export const ohapiMediaRouter = router({
 
     const nextStatus = classifyOhApiJob(state);
 
+    // The provider's link lives about a week. On completion the bytes are
+    // copied to our storage and the job is re-pointed at the durable URL;
+    // a copy that fails leaves the short-lived link in place.
+    let durableUrl: string | null = null;
+    if (nextStatus === "completed" && state.presignedUrl) {
+      durableUrl = await copyMediaResult({
+        sourceUrl: state.presignedUrl,
+        userId: ctx.user.id,
+        kind: job.kind,
+        providerJobId: input.jobId,
+      });
+    }
+
     if (nextStatus !== "pending") {
       await updateOhapiMediaJob({
         id: job.id,
         status: nextStatus,
-        resultUrl: state.presignedUrl,
+        resultUrl: durableUrl ?? state.presignedUrl,
         followupText: nextStatus === "completed" ? state.followupText : null,
         // The provider's failure text is not surfaced to the customer.
         errorMessage: nextStatus === "failed" ? "generation_failed" : null,
@@ -185,7 +199,7 @@ export const ohapiMediaRouter = router({
       // Only hand back a URL once the job is genuinely finished. The submission
       // response carries a presigned URL up front, and serving that early would
       // show the customer an empty or partial asset.
-      resultUrl: nextStatus === "completed" ? state.presignedUrl : null,
+      resultUrl: nextStatus === "completed" ? durableUrl ?? state.presignedUrl : null,
       followupText: nextStatus === "completed" ? state.followupText : null,
       errorMessage: nextStatus === "failed" ? "That generation could not be completed. Please try a different prompt." : null,
       // Owner-only. The provider rewrites the prompt before generating, and
