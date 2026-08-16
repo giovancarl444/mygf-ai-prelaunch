@@ -12,6 +12,7 @@ import Companion from "./pages/Companion";
 import Companions from "./pages/Companions";
 import Home from "./pages/Home";
 import OhapiStudio from "./pages/OhapiStudio";
+import Pricing from "./pages/Pricing";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/companions" component={Companions} />
       <Route path="/companion/:slug" component={Companion} />
       <Route path="/collection" component={Collection} />
+      <Route path="/pricing" component={Pricing} />
       <Route path="/signin" component={SignIn} />
         <Route path="/chat" component={Chat} />
       <Route path="/chat/:slug" component={Chat} />

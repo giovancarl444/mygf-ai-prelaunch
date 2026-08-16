@@ -2,6 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import { billingRouter } from "./billingRouter";
 import { ohapiChatRouter } from "./ohapiChat";
 import { ohapiCompanionsRouter } from "./ohapiCompanions";
 import { ohapiMediaRouter } from "./ohapiMedia";
@@ -28,6 +29,9 @@ export const appRouter = router({
   // Account-owned conversation and generation.
   chat: ohapiChatRouter,
   media: ohapiMediaRouter,
+  // Plans, balance, and hosted checkout. The grant happens on settlement,
+  // never inside the checkout procedure itself.
+  billing: billingRouter,
   // Owner-only operations, reachable exclusively from /ops/ohapi.
   ohapiStudio: ohapiStudioRouter,
 });

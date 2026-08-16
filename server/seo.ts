@@ -155,6 +155,32 @@ export async function describePage(pathname: string, baseUrl: string): Promise<P
     };
   }
 
+  if (pathname === "/pricing") {
+    const description = truncate(
+      "Premium is $14.99 a month or $83.88 a year: more conversation, plus photo, voice, "
+        + "and video credits in every thread. Adults only (18+).",
+      300,
+    );
+    return {
+      ...base,
+      title: `Pricing — ${SITE_NAME}`,
+      description,
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: `${SITE_NAME} Premium`,
+        description,
+        offers: {
+          "@type": "Offer",
+          price: "14.99",
+          priceCurrency: "USD",
+          availability: "https://schema.org/InStock",
+          url: canonical,
+        },
+      },
+    };
+  }
+
   // A visitor's saved collection is personal state, never a public page.
   if (pathname === "/collection") {
     return {
@@ -235,6 +261,7 @@ export async function renderSitemapXml(baseUrl: string) {
   const entries = [
     { loc: baseUrl, priority: "1.0", changefreq: "daily" },
     { loc: `${baseUrl}/companions`, priority: "0.9", changefreq: "daily" },
+    { loc: `${baseUrl}/pricing`, priority: "0.7", changefreq: "monthly" },
     ...companions.map(companion => ({
       loc: `${baseUrl}/companion/${companion.worldSlug}`,
       priority: "0.8",

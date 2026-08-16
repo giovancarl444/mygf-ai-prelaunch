@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerAuthRoutes } from "../auth";
+import { registerPaymentRoutes } from "../paymentsRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./static";
@@ -36,9 +37,17 @@ async function startServer() {
   // advisories for.
   app.disable("x-powered-by");
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
+  // Configure body parser with larger size limit for file uploads. The raw
+  // bytes are kept alongside the parsed body because the payment webhook
+  // verifies the processor's signature over exactly what was sent.
+  app.use(express.json({
+    limit: "50mb",
+    verify: (req, _res, buf) => {
+      (req as { rawBody?: Buffer }).rawBody = buf;
+    },
+  }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  registerPaymentRoutes(app);
   registerOAuthRoutes(app);
   // Our own sign-in. Mounted alongside the platform's OAuth callback rather
   // than replacing it, so accounts created before the move keep working while
