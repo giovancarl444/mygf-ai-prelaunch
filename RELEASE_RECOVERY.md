@@ -210,3 +210,35 @@ permission:
 
     git tag -a backup/provider-verified-rebuild-20260814 97918e2 -m "Provider-verified rebuild"
     git push origin backup/provider-verified-rebuild-20260814
+
+## Launch Stack — main promoted
+
+`main` was fast-forwarded from `d543c00` to `05a7c07` (plus this record).
+Nothing on `main` was rewritten or discarded; every prior commit remains an
+ancestor.
+
+| Recovery layer | Identifier |
+| --- | --- |
+| Previous `main` | `d543c00` — restore point for everything before the launch stack |
+| Recovery branch | `recovery/launch-stack-20260816` |
+| Annotated tag | `backup/launch-stack-20260816` |
+
+This release carries the six-branch launch stack over the provider-verified
+rebuild: the candy discovery design on the public pages (M1), the crypto
+payment rail in log mode with `/pricing` (M3), generation quality options,
+image-to-video and failure refunds (M3.5), durable media storage
+copy-on-complete (M4), the member collection persisted in the database (M2)
+with migration `0012_saved_companions`, and display type on the chat surface
+(M5).
+
+Migration `0012_saved_companions` must be applied before this code runs
+against an existing database; the deploy workflow applies it automatically
+from `drizzle/` on every push to `main`.
+
+The stack was re-verified at the tip before promotion: `tsc` clean, 297 tests
+passing with one intentional live-network probe skipped, and a production
+build with no correctness warnings. The six stacked branches
+(`claude/candy-discovery-port` through `claude/chat-restyle`) were pushed to
+the remote before promotion. In the same session,
+`ohapi-playground@6d7d627` (`fix/live-api-alignment`) was promoted to that
+repository's `main`; it has no deploy workflow.
